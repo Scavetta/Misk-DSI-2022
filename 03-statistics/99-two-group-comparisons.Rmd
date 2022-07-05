@@ -1,0 +1,285 @@
+---
+title: "2-group comparisons"
+author: "Misk DSI 2020"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    fig_caption: false
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, echo = FALSE)
+options(digits = 7)
+```
+
+```{r}
+# Load packages
+library(tidyverse)
+
+# Read in the data
+martian <- read_tsv("data/martian.txt")
+
+# # Data
+# martian_siteI <- martian$Height[martian$Site == "Site I"]
+# 
+# # p-value is 0.027
+# t.test(martian_siteI, mu = hypo_A, paired = FALSE)
+```
+
+
+## Two-sample t-tests
+
+What is the null hypothesis? Remember, this is the thing that is most boring, the thing that you want to reject!
+
+$\bar{x}_{Site I} = 200$
+
+$\bar{x}_{Site II} = 210$
+
+Previously, $H_0: \mu = 195cm$. Now... $H_0: \mu_{site I} - \mu_{site II} = 0$. i.e. if X does not predict Y, what do you expect to see?
+
+This is what I'd see if there was NO relationship, i.e. X doesn't matter.
+
+```{r}
+ggplot(martian, aes(x = 1, y = Height)) +
+  geom_jitter(width = 0.2) +
+  coord_cartesian(xlim = c(0,2)) +
+  labs(title = "No information from X at all")
+```
+
+```{r}
+ggplot(martian, aes(x = Site, y = Height)) +
+  geom_jitter(width = 0.2) +
+  coord_cartesian() +
+  labs(title = "ALL information from X that is available")
+```
+
+Our observed value must contain:
+
+- $\bar{x}_{Site I} = 200$, and
+- $\bar{x}_{Site II} = 210$
+
+
+$\bar{x}_{Site I} - \bar{x}_{Site II}$
+
+```{r}
+# Default welch's variant:
+t.test(Height ~ Site, data = martian)
+
+#(1 - pt(q = 3.7291, df = 18)) * 2
+
+```
+
+The p-value is 0.001536. What does this tell me?
+
+- We reject the null hypothesis!
+- There is evidence that the location (site) is related to the height.
+- There is an association between height and site.
+- We can use the location to predict height!
+
+Avoid saying "causes" or "influences" and also we're not quite ready for correlation yet.
+
+```{r}
+# Regular, assuming equal variant
+t.test(Height ~ Site, data = martian, var.equal = TRUE)
+```
+
+## Linear regression
+
+Our data:
+
+```{r}
+
+Site_speed_mean <- mean(martian$Speed.Mars[martian$Site == "Site I"])
+martian %>% 
+  filter(Site == "Site I") %>% 
+  ggplot(aes(x = 1, y = Speed.Mars)) +
+  geom_jitter(width = 0.2) +
+  geom_hline(aes(yintercept = Site_speed_mean, color = "Null model (y-bar)")) +
+  coord_cartesian(xlim = c(0,2)) +
+  labs(title = "No information from X at all")
+```
+
+At this point, our best guess for Martian speed is the mean, i.e. `r Site_speed_mean`s. Is there a variable that I can measure that would help me to predict how fast a Martian is?
+
+What about the height?
+
+
+```{r SpeedHeight}
+martian %>% 
+  filter(Site == "Site I") %>% 
+  ggplot(aes(x = Height, y = Speed.Mars)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(title = "ALL information from X (height)")
+```
+
+Bofore we do any analysis, we can already guess that height is a good predictor of speed, since a lot of points are closer to the line than mean given the mean of speed alone (i.e. the Null model taking no X into account.)
+
+Can we imagine a variable that would NOT predict speed?
+
+BMI doesn't look as good :/
+
+
+```{r SpeedBMI}
+martian %>% 
+  filter(Site == "Site I") %>% 
+  ggplot(aes(x = BMI, y = Speed.Mars)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(title = "ALL information from X (BMI)")
+```
+
+Eye score looks even worse :/
+
+```{r SpeedEye}
+martian %>% 
+  filter(Site == "Site I") %>% 
+  ggplot(aes(x = Eye, y = Speed.Mars)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(title = "ALL information from X (Eye score)")
+```
+
+Let's start to analyse our results:
+
+
+```{r}
+test <- tibble(x = c(2, 3, 5, 6),
+               y = c(2, 5, 4, 7))
+```
+
+
+```{r}
+ggplot(test, aes(x, y)) +
+  geom_point() +
+  geom_smooth(method = "lm", aes(color = "OLS model"), se = FALSE) +
+  geom_hline(aes(yintercept = mean(test$y), color = "Null model (y-bar)"), size = 1) +
+  coord_fixed() +
+  labs(title = "ALL information from X")
+```
+
+Do we want a perfect relationship? NO! We'll return to this with the bias-variance trade-off, but what we do want is to reduce the SSR to be as small as possible :) i.e. Minimize the SSR. That will give me the best possible model! :) :)
+
+### What is f(x)?
+
+y = mx + b
+
+m = slope
+b = y-intercept
+
+A better way to write this:
+
+$f(x) = \hat{y} = \hat{\beta_0} + \hat{\beta_1}x$
+
+$\hat{\beta_0}$ = y-intercept
+$\hat{\beta_1}$ = slope
+
+Both are "estimates" or "parameters" or "coefficients", number 0 and number 1. 
+
+So what are the $\hat{\beta_0}$ and $\hat{\beta_1}$ that will give me the smallest SSR (Sum of the Squared Residuals)?
+
+Suggestion: Moving the line around the points and measure the SSR. Then move it again and remeasure the SSR, if it's smaller then keep these values, or else go back to the original. Repeat... _as infinitum_. Eventually we'd get the best coefficients. We'll return to this concept in machine learning. We're trying to find the minimum of a function by reiteration.
+
+The analytical solution: There is a solved formula to get the coefficients that will provide the smallest SSR. $\hat{\beta_1}$ is defined by
+
+```{r echo = TRUE}
+COV_xy <- cov(test$x, test$y)
+var_x <- var(test$x)
+
+b_1 <- COV_xy/var_x
+b_1
+
+```
+
+Now we know $\hat{y} = \hat{\beta_0} + 0.9x$ So, What is $\hat{\beta_0}$? $\hat{\beta_0}$, y-intercept, just means what is the y value when x is 0. But if we just substitute 0 for x, it give us $\hat{y} = \hat{\beta_0}$, so that's not helpful. We need to substitute two values, one for x and one for y, that we know the OLS model will pass through. This is ($\bar{x}$, $\bar{y}$). Which we know are (4, 4.5). So we get $4.5 = \hat{\beta_0} + 0.9*4.0$. Solving for the equation give us $\hat{\beta_0} = 0.9$. Thus,
+
+$$\hat{y} = 0.9 + 0.9x$$
+
+```{r}
+b_0 <- 0.9
+```
+
+### Is the relationship between x & y statistically significant?
+
+For the signal:noise ratio: $$signal/noise = (obs - hypo)/sd(obs)$$
+
+1. What is the $H_0$? i.e. the most boring scenario is that the OLS model is no different than the Null model ($\bar{y}$). So in this case what would be $\hat{\beta_1}$? It must be 0! so... $H_0: \hat{\beta_1} = 0$.
+
+The Null model ($\bar{y}$) can also be written as.... ($f(x) = \bar{y} + 0x$)
+
+2. What is the observed value? $\hat{\beta_1} = 0.9$
+
+3. What is the error on the observed value? i.e. $sd(\hat{\beta_1})$. Skip these details, but we know that:
+
+- It will increase as the spread on y ($s_y$) increases
+- It will decrease as n increases
+
+just like the SEM ($s/\sqrt{n}$)
+
+4. What distribution describes this signal:noise ratio the best?
+
+Can the t-distribution work here? YES! but the $df$ will be $n-2$. Why minus 2? And for that matter, why does the $s^2$ contain $n-1$ and not just $n$ like $\bar{x}$?
+
+It's minus two because we have calculated two coefficients $\hat{\beta_0}$ and $\hat{\beta_1}$! For $s^2$ we had already calculated 1 parameter using the data, $\bar{x}$. Here $df = n - 2 = 4 - 2 = 2$
+
+```{r}
+test_lm <- lm(y ~ x, data = test)
+summary(test_lm)
+```
+
+The p-value for the slope, $\hat{\beta_1}$, is 0.21, which is very high although our model looks fantastic, since we have a very small $n$, and thus $df$. 
+
+In a sentence, what did we learn?
+
+- There is no significant relationship between X and Y.
+- There is a 21% chance to observe these results or something more extreme just by chance alone, i.e. if there was no relationship between these two variables.
+
+We get the p-value for b_1, but we're not interesetd in it.
+
+#### Return to Mars
+
+Let's look at our models:
+```{r}
+speed_lm <- lm(Speed.Mars ~ Height, data = martian[martian$Site == "Site I",])
+summary(speed_lm)
+```
+
+The $\hat{\beta_1}$ of this model is -0.441, which tells us that for every 1 unit (i.e. cm) increase in height, the Martian will run the 100 meters 0.45 seconds faster. i.e. $\frac{rise}{run} = \frac{(y_2 - y_1 )}{(x_2- x_1)} = \frac{\Delta{y}}{\Delta{x}}$ where $\Delta{x}$ = 1 unit. How much does y change for a 1 unit increase in x?
+
+But BMI and Eye sight score do not predict the speed result:
+
+```{r}
+speed_bmi <- lm(Speed.Mars ~ BMI, data = martian[martian$Site == "Site I",])
+summary(speed_bmi)
+
+```
+
+
+
+```{r}
+speed_eye <- lm(Speed.Mars ~ Eye, data = martian[martian$Site == "Site I",])
+summary(speed_eye)
+
+```
+
+
+
+### What does all of this have to do with correlation?
+
+
+
+
+
+
+
+
+
+
+
+
+

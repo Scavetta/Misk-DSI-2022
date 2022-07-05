@@ -1,0 +1,276 @@
+---
+title: "Hypothesis testing"
+author: "Misk DSI 2020"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    fig_caption: false
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(digits = 7)
+```
+
+## 95% CI in action
+
+Our 95% confidence interval for the Martian height (cm) at Site I is [196.28, 203.72]
+
+What is $\bar{x}$, $SEM$?
+
+```{r}
+
+# Manual calculations:
+# siteI_mean <- 196.28 + (203.72 - 196.28)/2
+
+# or just take the mid-point of these values:
+siteI_mean <- sum(196.28, 203.72)/2 # i.e. just take the mean
+
+siteI_SEM <- (203.72 - siteI_mean)/1.96
+
+```
+
+Recall, $95\%CI = \bar{x} \pm 1.96 * SEM$. What does the 95%CI tell me?
+
+- Answer: 95% of the population will be in this range. NO! You don't get to change the properties of the population by collecting more observations (i.e. the SEM getting smaller).
+- Answer: There is 95% chance that we'll cover the true mean of population $\mu$ with this area. YES!!!
+
+The only difference between what we've been doing so far and _Hypothesis Testing_ proper, is that we need to have a hypothesis to test!
+
+Imagine someone proposed _a priori_ the true Martian height at Site I is 195cm. We call this our _Null Hypothesis_ and we write it like this:
+
+Hypothesis **(A)**: $H_0: \mu = 195cm$
+
+Are the Martians at site I _significantly_ different form this prediction? Actually, this hypothesis can be _any_ number. e.g.
+Hypothesis **(B)**: $H_0: \mu = 196cm$
+
+## Hypothesis Testing using the Normal distribution
+
+### Method 1: The 95% CI
+
+Given the 95% CI for the Martians at Site I, [196.28, 203.72], do you think hypothesis **(A)** ($\mu = 195cm$) is a plausible (i.e. likely) value for the true population parameter $\mu$?
+
+NO! Because, it's not in the 95%CI. Thus, it's unlikely (but not impossible).
+
+Conclusion for hypothesis **(A)**: Reject $H_0$!
+
+What about **(B)** ($\mu = 196cm$)? 
+
+Conclusion for hypothesis **(B)**: Reject $H_0$! For the same reason, even if it's just a tiny bit outside the 95%CI.
+
+- Advantages: 
+  - Easy to make a decision (i.e. test a hypothesis)
+  - Intuitive (all values are on the original scale)
+- Disadvantages:
+  - Black/white, either you're in or you're out
+
+### Method 2: Using the CLT
+
+aka: "one value, two curves" - One country, two policies like what we saw in developing the Standard Normal Distribution.
+
+The whole reason we used the 95% CI, was because we didn't know what $\mu$ was, but now that we have a _hypothesis_ for $\mu$, let's just plug it into the CLT equation and draw the curve for the distribution of the sample means. We'll use $s$ in place of $\sigma$ to get the SEM.
+
+Using these values, what is the range, according to the CLT, where I would expect to find 95% of my $\bar{x}$?
+
+```{r}
+# centered on mu
+hypo_A <- 195
+# use also: siteI_SEM from above
+
+# 95% of the x-bars are:
+CLT_A_lower <- hypo_A - (1.96 * siteI_SEM)
+CLT_A_upper <- hypo_A + (1.96 * siteI_SEM)
+```
+
+According to the CLT, if hypothesis **(A)** were indeed true, then we'd expect to find that 95% of our $\bar{x}$ are within the interval [`r CLT_A_lower`, `r CLT_A_upper`]. So now, is our $\bar{x}$ plausible (i.e. likely) given this scenario?
+
+NO! Because, it's not in the range where we expect to find 95% of our $\bar{x}$ according to the CLT. Thus it's unlikely (but not impossible).
+
+Conclusion for hypothesis **(A)**: Reject $H_0$! Because it's unlike to be true since if it was, it's very unlikely that we would see our $\bar{x}$, but we believe our results because we're good scientists, i.e. we don't have systematic error.
+
+So not let's try this with Hypothesis **(B)**
+
+```{r}
+# centered on mu
+hypo_B <- 196
+# use also: siteI_SEM from above
+
+# 95% of the x-bars are:
+CLT_B_lower <- hypo_B - (1.96 * siteI_SEM)
+CLT_B_upper <- hypo_B + (1.96 * siteI_SEM)
+
+```
+
+According to the CLT, if hypothesis **(B)** were indeed true, then we'd expect to find that 95% of our $\bar{x}$ are within the interval [`r CLT_B_lower`, `r CLT_B_upper`]. So now, is our $\bar{x}$ plausible (i.e. likely) given this scenario?
+
+NO! Because, it's not in the range where we expect to find 95% of our $\bar{x}$ according to the CLT. Thus it's unlikely (but not impossible). This is the same reasoning as with hypothesis **(A)**.
+
+Conclusion for hypothesis **(B)**: Reject $H_0$! Because it's unlikely to be true since if it was, it's very unlikely that we would see our $\bar{x}$, but we believe our results because we're good scientists, i.e. we don't have systematic error.
+
+- Advantages: 
+  - Easy to make a decision (i.e. test a hypothesis)
+  - Intuitive (all values are on the original scale)
+  - Since we have a distribution, we can ask _how far_ outside the range is our $\bar{x}$.
+- Disadvantages:
+  - A different "null distribution" for every hypothesis, i.e. "one value, two curves".
+  - Difficult to compare different results.
+
+### Method 3: Using a test statistic
+
+i.e. "one curve, two values", similar to the Z--scores situation.
+
+Put these values on one Standardized curve: N(0,1) Standard Normal Distribution
+
+What is an "extreme value" in the Standard Normal Distribution? [-1.96, 1.96]
+
+Calculate the signal:noise for **(A)**
+
+```{r}
+hypo_A # i.e. mu
+siteI_mean # observed value, i.e. x_i, here x-bar the observed mean
+siteI_SEM # NOISE: standard deviation of the observed value, i.e. s for x_i, or SD(x-bar), i.e. SEM, for x-bar
+
+SIGNAL_A <- siteI_mean - hypo_A # SIGNAL
+test_stat_A <- SIGNAL_A/siteI_SEM
+
+```
+
+Given hypothesis **(A)**, we get a test statistics of `r test_stat_A`, so we reject $H_0$ because it's outside the range [-1.96, 1.96]. 
+
+Calculate the signal:noise for **(B)**
+
+```{r}
+hypo_B # i.e. mu
+siteI_mean # observed value, i.e. x_i, here x-bar the observed mean
+siteI_SEM # NOISE: standard deviation of the observed value, i.e. s for x_i, or SD(x-bar), i.e. SEM, for x-bar
+
+SIGNAL_B <- siteI_mean - hypo_B # SIGNAL
+test_stat_B <- SIGNAL_B/siteI_SEM
+
+```
+
+Given hypothesis **(B)**, we get a test statistic of `r test_stat_B`, so we reject $H_0$ because it's outside the range [-1.96, 1.96]. 
+
+So for each hypothesis, we just reduce the entire problem to a single signal:noise ratio (aka test statistics). Our new "null distribution" is the Standard Normal Distribution and not the CLT. 
+
+- Advantages: 
+  - Easy to make a decision (i.e. test a hypothesis) - is the test statistic inside our outside the range [-1.96, 1.96]?
+  - Since we have a distribution, we can ask _how far_ outside the range is our test statistic is.
+  - A single "null distribution" for every hypothesis, i.e. "one curve, two values".
+  - Easy to compare very different results on a common standardized scale.
+- Disadvantages:
+  - Not intuitive (the values are no longer on the original scale). Everything gets reduced to a standard score which doesn't really tell us anything about the original scales.
+
+Take-home message: the test statistic is some observed value (e.g. $\bar{x}$) minus some hypothesised value divided by some scaling factor (which is directly related to the error on measuring the observed value, i.e. SEM).
+
+## Using the t distribution
+
+### Method 1: The 95% CI
+
+```{r}
+# To get the cutoff for the Standard Normal distribution use:
+# i.e. the area under the curve from -Inf to the "p" argument
+# for 95% use 0.975, since there is only 2.5% left on the right side
+N_cutoff <- qnorm(p = 0.975, mean = 0, sd = 1)
+
+# for the t-distribution, we only use the "df"
+n <- 10 # 10 martians at site I
+t_10 <- qt(p = 0.975, df = n - 1)
+
+# The critical value for t(df = 4)
+# qt(p = 0.975, df = 4)
+
+```
+
+Using the t-distribution, means that insead of defining the 95% CI as $95\%CI = \bar{x} \pm 1.96 * SEM$,  we now have to adjust it to use the $t_{n-1}$ value. In our case that's `r t_10`. Thus we get a larger 95% CI. The smaller my sample size, the larger the 95% CI will expand.
+
+```{r}
+# 95% CI on Normal, [196.28, 203.72]
+CI_lower <- siteI_mean - (N_cutoff * siteI_SEM)
+CI_upper <- siteI_mean + (N_cutoff * siteI_SEM)
+
+# 95% CI on the t-distribution, [195.71, 204.29]
+CI_lower_t <- siteI_mean - (t_10 * siteI_SEM)
+CI_upper_t <- siteI_mean + (t_10 * siteI_SEM)
+
+```
+
+Thus, the 96% CI increased from [`r CI_lower`, `r CI_upper`] when we used the Normal distribution to [`r CI_lower_t`, `r CI_upper_t`] when using the t-distribution.
+
+Hypothesis **(A)**: $H_0: \mu = 195cm$ -- Reject $H_0$!
+Hypothesis **(B)**: $H_0: \mu = 196cm$ -- Fail to reject $H_0$!
+
+BUT... we can NEVER say "accept" the null hypothesis, because this would mean that we "know" what the truth is, which we don't because any other value within our 95% is "fair game" to be the _true_ population parameter $\mu$, so we can't accept this hypothesis, only, "reject" or "fail to reject"
+
+These results may differ from using the Normal distribution. Hypothesis that were formerly rejected are not plausible and thus cannot be reject.
+
+### Method 2: Using the CLT
+
+_Not applicable here_.
+
+### Method 3: Using a test statistic
+
+What change here? Actually we have the SAME test statistics as above. Nothing changes there:
+
+```{r}
+test_stat_A
+```
+
+
+```{r}
+test_stat_B
+```
+
+So what does change? What is an "extreme value" in the Standard Normal Distribution, [-1.96, 1.96], is no longer interesting. NOW, we want to know that range using our specific t-distribution: [`r -t_10`, `r t_10`]. Are the test-statistics inside or outside the range.
+
+The conclusions in method 1 and 3 using the t-distribution MUST match.
+
+Hypothesis **(A)**: $H_0: \mu = 195cm$ -- Reject $H_0$!
+Hypothesis **(B)**: $H_0: \mu = 196cm$ -- Fail to reject $H_0$!
+
+Now that we have a distribution, we're going to find out how far oursite our observation lies, i.e. the p-value!
+
+i.e. for Hypothesis A, we got a test statistic `r test_stat_A`.
+
+```{r}
+# test_stat_A
+
+# put this on the appropriate t-distribution
+# "q" is the position on the x 
+
+# What's the area under the curve from -Inf to our test statistic:
+# pt(q = test_stat_A, df = 9)
+
+# What's the area under the curve from Inf to our test statistic:
+# 1 - pt(q = test_stat_A, df = 9)
+
+# But we want both sides, since I don't care if the result is higher or lower than the hypothesis (i.e. its two-sided):
+(1 - pt(q = test_stat_A, df = 9)) * 2
+
+# p-value is 0.027
+```
+
+The p-value, 0.027, is the probability to observe what I observe, or something more extreme, if the null hypothesis was true. Thus, there is a 2.7% chance to observe what I observe (mean of 200) or more extreme (more than 200 or less than 190, i.e. both 5 cm away from the hypothesised value) is the hypothesis was indeed true.
+
+This is basically a one-sample t-test:
+
+```{r eval = FALSE}
+# Load packages
+library(tidyverse)
+
+# Read in the data
+# martian <- read_tsv("data/martian.txt")
+martian <- read_tsv("./00-data/martians.txt")
+
+# Data
+martian_siteI <- martian$Height[martian$Site == "Site I"]
+
+# p-value is 0.027
+t.test(martian_siteI, mu = hypo_A, paired = FALSE)
+```
+

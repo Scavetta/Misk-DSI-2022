@@ -1,0 +1,1041 @@
+---
+title: "Data Science Immersive: Data Visualization"
+subtitle: "Introduction to ggplot2"
+author: "Rick Scavetta, for Misk Skills"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    toc_depth: 3
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the practical component of the **Data Visualization** module of
+the Misk Skills Data Science Immersive
+
+To use this markdown document, make sure you have installed `ggplot2`
+(`munsell`, `RColorBrewer` and `Hmisc` should be installed as
+dependencies). You can click on the knit button to execute all the code
+and produce an HTML output, which is already provided for you in the
+files pane to the right.
+
+```{r}
+# load packages, (pre-installed with tidyverse)
+library(ggplot2)
+
+# These are not strictly necessary, but we'll use them for looking at some specific examples 
+library(munsell)
+library(RColorBrewer)
+library(Hmisc)
+```
+
+We'll begin by looking at accessing colors and then move onto `ggplot2`.
+
+# Using Color
+
+There many packages that provide colour palettes in R. The most widely
+used and fundamental is `RColorBrewer`. These pallets come from Cynthia
+Brewer, a cartographer who developed the pallets for her map-making
+colleagues. They are a good starting point for us and well integrated
+into ggplot2 and you can find a handy web-site summary
+[here](https://colorbrewer2.org).
+
+The *sequential* color palettes:
+
+```{r}
+display.brewer.all(type = "seq")
+```
+
+The *qualitative* color palettes:
+
+```{r}
+display.brewer.all(type = "qual")
+```
+
+The *divergent* color palettes:
+
+```{r}
+display.brewer.all(type = "div")
+```
+
+To view all the available pallets use:
+
+```{r eval = FALSE}
+display.brewer.all()
+```
+
+To access a given number of colors in a specific pallet use:
+
+```{r}
+display.brewer.pal(9, "Blues")
+```
+
+If you use
+
+```{r}
+brewer.pal(9, "Blues")
+```
+
+you'll get a character vector of the hex codes (discussed in the ebook).
+Just like any other vector in R, we can index this using `[]`. Here,
+we'll just take three shades of blue and assign them to the object
+`myBlues`.
+
+```{r}
+myBlues <- brewer.pal(9, "Blues")[c(4,6,8)]
+```
+
+Once you have these hex codes, You can use them in all and graphics to
+maintain consistency in your color palette across your presentation or
+paper. If you want to view what colour the hex code is, the munsell
+package has a really nice function:
+
+```{r}
+plot_hex(myBlues)
+```
+
+# ggplot2: The first three essential layers
+
+Now that we have an idea of how to obtain color values, let's dig into
+`ggplot2`. In the case studies I presented `ggplot2` as being comprised
+of seven layers.
+
+## Layer 1: The data layer
+
+I discussed the data layer in the first case study looking at peppermint
+sugar content. We need each variable on our plot to be its own variable
+in our data site.
+
+There are many built in datasets in R. A really good starting point for
+understanding `ggplot2` is the `mtcars` data set. It describes the
+properties of 32 engines from cars in 1973. The *mt* in `mtcars` stands
+for *Motor Trends*, a magazine that apparently was ahead of the game in
+providing detailed engine metrics.
+
+The dataset contains the following variables:
+
+| Variable | Description                              |
+|----------|------------------------------------------|
+| mpg      | Miles/(US) gallon                        |
+| cyl      | Number of cylinders                      |
+| disp     | Displacement (cu.in.)                    |
+| hp       | Gross horsepower                         |
+| drat     | Rear axle ratio                          |
+| wt       | Weight (1000 lbs)                        |
+| qsec     | 1/4 mile time                            |
+| vs       | Engine (0 = V-shaped, 1 = straight)      |
+| am       | Transmission (0 = automatic, 1 = manual) |
+| gear     | Number of forward gears                  |
+| carb     | Number of carburetors                    |
+
+You can access the dataset directly from base package.
+
+```{r}
+mtcars
+```
+
+## Layers 2: Aesthetics
+
+The second essential layer is the aesthetics layer. In the course, we
+referred to these as the *encoding* elements. Other names for aesthetics
+are *scales* or *axes*. e.g. we typically refer to the X axis, but there
+are many other aesthetics which work in the same way. Let's begin with
+the X and Y axes.
+
+```{r}
+# Univariate plot - Histogram
+ggplot(mtcars, aes(x = mpg))
+```
+
+```{r}
+# Bi-/Multi-variate plot - Scatter plot
+ggplot(mtcars, aes(x = wt, y = mpg))
+```
+
+Notice that in the above plots, we have *literally* what we ask for: a
+histogram with an X axis and a scatter plot with X and Y axes. There are
+no visuals, i.e. geometries, since they need to be added as a separate
+layer. We'll get to that soon.
+
+The first arguments of `aes()` are `x` and `y`, so we'll typically leave
+them out. Other common aesthetics are:
+
+-   `color`
+
+    -   Also, `colour`
+
+-   `fill`
+
+-   `shape`
+
+-   `size`
+
+-   `linetype`
+
+You'll often see `color` called as as `col`, using partial name
+matching, to call the argument. I tend to do this, but it's a bad habit.
+The best practice is to call the entire name.
+
+## Layers 3: Geometries
+
+The third essential layer is the geometries layer. Here we specify what
+we actually want to see. You'll see that the naming convention of the
+functions in `ggplot2` are very well organized! All the geometries have
+the form `geom_*()`. You can see a list by typing `geom_` in an R script
+document and pressing tab for auto complete. There are currently 48
+geometries:
+
+| geom\_\* |            |           |           |            |          |        |
+|----------|------------|-----------|-----------|------------|----------|--------|
+| abline   | contour    | dotplot   | jitter    | pointrange | ribbon   | spoke  |
+| area     | count      | errorbar  | label     | polygon    | rug      | step   |
+| bar      | crossbar   | errorbarh | line      | qq         | segment  | text   |
+| bin2d    | curve      | freqpoly  | linerange | qq_line    | sf       | tile   |
+| blank    | density    | hex       | map       | quantile   | sf_label | violin |
+| boxplot  | density2d  | histogram | path      | raster     | sf_text  | vline  |
+| col      | density_2d | hline     | point     | rect       | smooth   |        |
+
+For example, to make a histogram, we'll use:
+
+```{r}
+# Univariate plot - Histogram
+ggplot(mtcars, aes(mpg)) +
+  geom_histogram()
+```
+
+But for scatter plots, there is no scatter plot geom. We just need to
+have continuous X and Y axes and apply a point geom layer:
+
+```{r}
+# Bi-/Multi-variate plot - Scatter plot
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point()
+```
+
+These are very basic parts, so let's spruce them up. Noticed that our
+histogram automatically defaults to giving us 32 equally sized bins on
+the X axis. `geom_histogram()` bins a continuous variable, counts the
+number of observations in each bin, and then maps that variable onto a Y
+aesthetic. It's likely that we'll want to have more intuitive bin sizes,
+in this case 1 unit. It's also typical that the tick marks on the X axis
+fall *between* the bars, and *not* in the middle. This tells us that
+each bar is a range of values and not a discrete value.
+
+```{r}
+# Univariate plot - Histogram
+ggplot(mtcars, aes(mpg)) +
+  geom_histogram(binwidth = 1, boundary = 1)
+```
+
+For the scatter plots, we may want to adjust the geom's *attributes*:
+
+```{r}
+# Bi-/Multi-variate plot - Scatter plot
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point(
+    shape = 16, 
+    alpha = 0.6,
+    size = 3,
+    # fill = "pink"
+    color = "green"
+  )
+```
+
+The first argument, `shape` specifies the *shape* to use, as a built-in
+R integer code. I find that the most common & useful values for the
+`shape` argument are:
+
++---+------------------------------------+-----------------------------+
+| V | Output                             | Aesthetic/Attribute         |
+| a |                                    | argument                    |
+| l |                                    |                             |
+| u |                                    |                             |
+| e |                                    |                             |
++===+====================================+=============================+
+| ` | A single pixel, the smallest       | `color`                     |
+| " | possible point.                    |                             |
+| . |                                    |                             |
+| " |                                    |                             |
+| ` |                                    |                             |
++---+------------------------------------+-----------------------------+
+| ` | Hollow circles                     | `color`                     |
+| 1 |                                    |                             |
+| ` |                                    |                             |
++---+------------------------------------+-----------------------------+
+| ` | Filled circles, no outline (my     | `color`                     |
+| 1 | favorite)                          |                             |
+| 6 |                                    |                             |
+| ` |                                    |                             |
++---+------------------------------------+-----------------------------+
+| ` | Filled circle, with an outline of  | `color`                     |
+| 1 | the *same* colour                  |                             |
+| 9 |                                    |                             |
+| ` |                                    |                             |
++---+------------------------------------+-----------------------------+
+| ` | Filled circle, 2/3 the size of     | `color`                     |
+| 2 | `19`                               |                             |
+| 0 |                                    |                             |
+| ` |                                    |                             |
++---+------------------------------------+-----------------------------+
+| ` | Filled circle, with an outline of  | `color` the outline, `fill` |
+| 2 | a *different* colour               | for the inside.             |
+| 1 |                                    |                             |
+| ` |                                    |                             |
++---+------------------------------------+-----------------------------+
+
+The `fill` aesthetic and attribute typically refers to the *inside* of a
+geometry, as we'll see later. However, An exception to the rule is with
+points. Here, we typically use the `color` aesthetic, except in the case
+where a circle has an outline which we see in shape `21`.
+
+Recall that *alpha* refers to transparency. For `alpha`, `1` = 100%
+opaque and `0` = 0% opaque (i.e. 100% transparent). I typically use a
+value between 0.3 - 0.7.
+
+The `size` argument adjusts the points size.
+
+Returning to our discussion of over-plotting in the video course, in
+this case I would use the above corrections (solid, slightly transparent
+points) *or* I would go with hollow, opaque points.
+
+```{r}
+# Bi-/Multi-variate plot - Scatter plot
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point(shape = 1)
+```
+
+These argument names are the same names as the *aesthetics* I mentioned
+earlier! This is common point of confusion, so note the distinction
+between:
+
+-   **Aesthetics**, which are arguments in the aesthetics layer, defined
+    inside `aes()`, and are used to *map* a variable onto a scale, and
+-   **Attributes**, which are arguments in the geom later, and are used
+    to *set* a value.
+
+The terms *scale*, *aesthetic*, and *axis* are commonly used
+interchangeably, but at specific points in making the plot, so don't let
+this confuse you.
+
+Let's add another aesthetic to see what I mean:
+
+```{r}
+# Bi-/Multi-variate plot - Scatter plot
+ggplot(mtcars, aes(wt, mpg, color = cyl)) +
+  geom_point(shape = 16, alpha = 0.6,
+             size = 3)
+```
+
+The points are now colored according to `cyl`, i.e. we *mapped* `cyl`
+onto `color`. Unfortunately, it's the wrong colour scale. It's a
+sequential, continuous color scale, but should be a qualitative color
+scale. You may recall from the data analysis class that categorical
+variables are defined as factors in R. We can set this on the fly in our
+plot.
+
+```{r}
+# Bi-/Multi-variate plot - Scatter plot
+ggplot(mtcars, aes(wt, mpg, col = factor(cyl))) +
+  geom_point(shape = 16, alpha = 0.6,
+             size = 3)
+```
+
+That's better. We'll change it permanently in the dataset later on.
+
+So what happens if we set a colour aesthetic *and* a colour attribute?
+
+```{r}
+# Bi-/Multi-variate plot - Scatter plot
+ggplot(mtcars, aes(wt, mpg, col = factor(cyl))) +
+  geom_point(shape = 16, alpha = 0.6,
+             size = 3, color = "pink")
+```
+
+Attributes beat out aesthetics! This is another really common problem,
+but if we are aware of this behavior we can use it to good effect.
+
+## Positions
+
+So far our plots have used position "identity", Which means don't do
+anything, just put the geometry exactly where the data says to put it.
+That's the default for `geom_point()`, which kind of makes sense. But
+that doesn't make sense for things like bar plots.
+
+Let's take a look. Our goal is to make a plot of this contigency table.
+It tells us the number of counts for each transmission (`am`) type, 0 &
+1, in each cylinder (`cyl`) class, 4, 6, & 8.
+
+```{r}
+table(mtcars$am, mtcars$cyl)
+```
+
+Remember, `ggplot2` requires a dataframe as input, so we may be tempted
+to convert the above table to a dataframe. We have the raw values, but
+what we want to plot is the absolute count of the number of
+observations. We could calculate the number of observations in each
+group ourselves, but we can just let ggplot2 do all of that for us.
+
+We're going to make a couple versions of this plot, so I'm going to
+assign the data and aesthetics layers to an object, called `g`. You'll
+see this a lot in ggplot2 programming. Sometimes the object names are
+one letter long, which is typically pretty bad style but somehow people
+get away with it in this case, mostly for the sake of convenience.
+Typical letters are `g`, `p`, & `q`. Although I'm introducing this
+concept here, since it makes this example convenient, I want to
+emphasize that you **do not** need to do this when just making a single
+plot. It has lots of very useful applications for when your code gets
+more complicated. You'll see it in help pages and tutorials, so it's
+good to be aware of this practice.
+
+```{r}
+# base layers
+g <- ggplot(mtcars, aes(factor(cyl), fill = factor(am)))
+
+g
+
+```
+
+`geom_bar()` will apply a count statistic to our data, which is
+basically what `table()` did.
+
+```{r}
+# Default bar plot
+g +
+  geom_bar()
+```
+
+The default position is `"stack"`, which can be specified as:
+
+```{r}
+# Which is...
+g +
+  geom_bar(position = "stack")
+
+```
+
+```{r}
+g +
+  geom_bar(position = "fill") +
+  scale_y_continuous("Proportion") +
+  coord_flip()
+```
+
+Position `"stack"` is pretty problematic because there is inherent
+confusion if the bars are actually *stacked* or if they are
+*overlapping* each other. It sounds strange, but actually, it's not
+obvious to the reader which one it is, so we want to avoid this
+ambiguity. Position `"dodge"` takes care of this for us:
+
+```{r}
+
+# position "dodge"
+g +
+  geom_bar(position = "dodge")
+```
+
+Remember, the two most commonly used Gestalt principles? Similarity &
+proximity. This plot takes care of all that for us.
+
+Position `"fill"` is also really nice but this provides the proportional
+values, noticed that the Y axis name doesn't change, it still says
+"count", So you'll need to use a `scale_*_*()` function, see below, to
+change it.
+
+```{r}
+# position "fill"
+g +
+  geom_bar(position = "fill")
+```
+
+Did you see how it was convenient to use the object `g` Instead of
+copying and pasting the base layer? We'll see this couple more times in
+the tutorial.
+
+## Adjusting aesthetics using the scales functions
+
+Before we move onto the other layers the last key thing you should know
+about the first three essential layers is how to adjust the scales. This
+is done using one of the scales functions. Like the geom functions,
+there is an intuitive naming convention. All the scale functions follow
+the form `scale_*_*()`.
+
+The first `*` refers to which scale you want to modify, e.g.:
+
+-   `scale_x_*()`
+
+-   `scale_y_*()`
+
+-   `scale_color_*()`
+
+    -   Also `scale_colour_*()`
+
+-   `scale_fill_*()`
+
+-   `scale_shape_*()`
+
+-   `scale_linetype_*()`
+
+-   `scale_size_*()`
+
+This **must** match the aesthetics that you're actually using in the
+plot, or nothing will happen.
+
+The second `*` refers to which *type* of scale to use, e.g.:
+
+-   **`scale_x_continuous()`**
+
+-   **`scale_y_continuous()`**
+
+-   **`scale_color_discrete()`**
+
+    -   also, `scale_colour_discrete()`
+
+In our scatterplot we have three aesthetics, X, Y and color. Let's take
+at how to use these functions one at a time. Here's our starting point:
+
+```{r}
+# Base layers
+p <- ggplot(mtcars, aes(wt, mpg, col = factor(cyl))) +
+  geom_point(shape = 16, alpha = 0.6, size = 3)
+
+p
+```
+
+Update colour scale, manual:
+
+```{r}
+# Scales (i.e. aesthetics)
+p <- p +
+  scale_colour_manual("Cylinders", values = myBlues)
+
+p
+
+```
+
+Noticed that the first argument is the name that we want applied to that
+scale. In this case we also use the values function to add the colour
+palette that we defined in the previous section.
+
+Update X axis, continuous:
+
+```{r}
+p <- p +
+  scale_x_continuous("Weight (1000 lbs)", limits = c(0,6), breaks = 0:6, expand = c(0,0))
+p
+
+```
+
+The `limits` argument defines the scale's range, `breaks` defines where
+to place the major tick marks, and `expand` is a two-element long
+numeric vector specifying the *additive* and *multiplicative* padding at
+the end of the axes. The default setting here is 5% extra room of the
+entire scale. The reason for this is that if you have a data point
+directly on the scale, and you don't have the buffering, then it could
+be obscured by the axis. If you're sure that you don't need buffering,
+it's fine to remove it.
+
+Update Y axis, continuous:
+
+```{r}
+# Scales (i.e. aesthetics)
+p <- p +
+  scale_y_continuous("mpg", limits = c(10,35), expand = c(0,0))
+p
+```
+
+Of course you can do this all in one step, I broke it apart above so you
+can see each piece.
+
+```{r}
+ggplot(mtcars, aes(wt, mpg, col = factor(cyl))) +
+  geom_point(shape = 16, alpha = 0.6, size = 3) +
+  scale_colour_manual("Cylinders", values = myBlues) +
+  scale_x_continuous("Weight (1000 lbs)", limits = c(0,6), breaks = 0:6, expand = c(0,0)) +
+  scale_y_continuous("mpg", limits = c(10,35), expand = c(0,0))
+```
+
+Notice that the way our plotting commands are built means we can comment
+out a specific line if we don't need it.
+
+```{r}
+ggplot(mtcars, aes(wt, mpg, col = factor(cyl))) +
+  geom_point(shape = 16, alpha = 0.6, size = 3) +
+  scale_colour_manual("Cylinders", values = myBlues) +
+  # scale_x_continuous("Weight (1000 lbs)", limits = c(0,6), breaks = 0:6, expand = c(0,0)) +
+  scale_y_continuous("mpg", limits = c(10,35), expand = c(0,0))
+```
+
+This won't work if it's the last line that we want to comment out. We'd
+have a hanging `+`, which would indicate to R that our command is not
+complete. So, if you feel that you want to experiment and comment out
+certain commands, you can end your ggplot call with `NULL`.
+
+```{r}
+ggplot(mtcars, aes(wt, mpg, col = factor(cyl))) +
+  geom_point(shape = 16, alpha = 0.6, size = 3) +
+  scale_colour_manual("Cylinders", values = myBlues) +
+  scale_x_continuous("Weight (1000 lbs)", limits = c(0,6), breaks = 0:6, expand = c(0,0)) +
+  # scale_y_continuous("mpg", limits = c(10,35), expand = c(0,0)) +
+  NULL
+```
+
+You may be tempted to copy and paste code layers between plots, but be
+very cautious with copying and pasting scale functions! If you apply a
+limit to a data set, you may remove data that's actually interesting
+just look at. Always plot the three essential layers *without* modifying
+the scales, then apply these functions to clean up your plot.
+
+# ggplot2: The optional 4 layers
+
+Let's take a look at the last four layers.
+
+## Layer 4: Statistics
+
+We'll look at applying two very common statistics to your plots in this
+layer.
+
+### Smoothing lines
+
+We can add a LOESS curve, which is a non-parametric model, using:
+
+```{r}
+p + 
+  stat_smooth(se = FALSE) # LOESS, default
+```
+
+The `se` argument specifies whether we want to plot the *95% Confidence
+Interval* or not.
+
+We can plot a classic OLS model by specifying the `method`:
+
+```{r}
+# Add an OLS linear model
+p + stat_smooth(method = "lm", se = FALSE) # Linear Model
+```
+
+Notice that because we have a `color` aesthetic, models are applied to
+each group separately. The reason for this is that there is an invisible
+aesthetic, called `group`, which inherits group identity from `color`.
+We can override the `group` aesthetic by defining it as a *dummy*
+variable, e.g. `1`, within the stats layer. Thus, we can color the
+points according to one variable, but apply the model to *all* the data.
+
+```{r}
+# override the col/group aes:
+p + stat_smooth(aes(group = 1), method = "lm", se = FALSE) # one group
+```
+
+### Summary statistics:
+
+Other common statistics that you'll often apply summary statistics.
+Before we proceed, let's clean up our data. I will use some base package
+functions to convert `cyl` and `am` to proper factor variables.
+
+```{r}
+mtcars$fcyl <- as.factor(mtcars$cyl)
+mtcars$fam <- as.factor(mtcars$am)
+```
+
+We saw that positions are defined with the `position` argument within an
+geom, but we can also specify them using functions. As you would expect
+these functions take the form `position_*()`. The two advantages of
+defining positions in a function are that we can specify the arguments
+precisely, and we can reuse positions in many layers or in many plots.
+
+```{r}
+posn_d <- position_dodge(0.3)
+posn_j <- position_jitter(0.3)
+posn_jd <- position_jitterdodge(0.3, dodge.width = 0.3)
+```
+
+All right let's begin to make a plot. Here's the base layer with 3
+variables:
+
+```{r}
+q <- ggplot(mtcars, aes(fcyl, wt, col = fam))
+q
+```
+
+First thing we want is to plot individual points.
+
+```{r}
+q +
+  geom_point(alpha =  0.6)
+```
+
+You can see the case for jittering here. We can use `geom_jitter()` and
+specify the width.
+
+```{r}
+q +
+  geom_jitter(width = 0.3, alpha =  0.6)
+```
+
+But we can also use `geom_point()` and specify jittering using our
+position function.
+
+```{r}
+q +
+  geom_point(position = posn_j, alpha =  0.6)
+```
+
+Indeed, we may want to have not just jittering, but both jitter and
+dodge.
+
+```{r}
+q +
+  geom_point(position = posn_jd, alpha =  0.6)
+```
+
+Let's add some statistics: the mean and standard deviation. Before we
+plot the mean and standard deviation, let's take a look at how we are
+going to get them. I'll begin with some random numbers as an example:
+
+```{r}
+set.seed(136)
+xx <- rnorm(100, 10, 6)
+mean(xx)
+sd(xx)
+```
+
+The function were going to use to calculate the mean and standard
+deviation, `smean.sdl()`, comes from the `Hmisc` package. The `mult`
+argument says we only want one multiple of the standard deviation. We
+loaded this package at the beginning of the script.
+
+```{r}
+smean.sdl(xx, mult = 1)
+```
+
+I loaded the package because I wanted to show you how it works, but if
+you want to do this in your own functions you don't need to explicitly
+called `Hmisc`. That's because the `ggplot2` function we're going to
+use, `mean_sdl()`, will call the `Hmisc` function for us.
+
+```{r}
+mean_sdl(xx, mult = 1)
+```
+
+Can you spot the difference in the output format? The ggplot2 function
+returns a dataframe. Each variable is named after an aesthetic we need
+to plot: the mean and the mean +/- 1 standard deviation, thus `ymin`,
+`y`, and `ymax`. `ymin` and `ymax` work just like X, Y, color, etc. that
+we saw before. To use this function inside our plot, use:
+
+```{r}
+q +
+  stat_summary(fun.data = mean_sdl, 
+               fun.args = list(mult = 1),
+               position = posn_d)
+```
+
+There are 3 things to note inside here.
+
+First, we specified to function without brackets, `mean_sdl`, to the
+`fun.data` argument. This argument expects the output that we saw above
+including all three aesthetics. If we only want to specify one, we can
+use `fun.ymin`, `fun.y`, `fun.ymax` or any combination. You probably
+guessed that the `fun` part means *function*.
+
+Second, notice that `mult = 1` is necessary, and in `stat_summary()`, We
+need to provide arguments to our stat function as a list to the
+`fun.args` argument.
+
+Third, we again set the position using a previously defined object.
+
+Let's move onto inferential statistics: the mean and the 95% CI. The
+function to use here is `mean_cl_normal()`. It works exactly like what
+we saw earlier with `mean_sdl()`, except we don't need to specify any
+arguments since it defaults to 95%. Although it has normal in the name,
+it is the t-corrected 95% CI. In this case we only need to dodge.
+
+```{r}
+q +
+  stat_summary(fun.data = mean_cl_normal,
+               position = posn_d)
+```
+
+We can of course combine individual points and a summary:
+
+```{r}
+q +
+  geom_point(position = posn_jd, alpha =  0.6) +
+  stat_summary(fun.data = mean_sdl, 
+               fun.args = list(mult = 1),
+               position = posn_d)
+```
+
+## Layer 5: Coordinates
+
+In the video course, I presented the `coord_` layer in the context of
+the aspect ratio. Here I want to take a look at a very important
+practical aspect. Continue with the plot we just made above, where we
+had the mean and standard deviation:
+
+```{r}
+q +
+  stat_summary(fun.data = mean_sdl, 
+               fun.args = list(mult = 1),
+               position = posn_d)
+```
+
+Imagine that I now want to set a limit on the Y axis, since the error
+bars don't go above 5.
+
+```{r}
+q +
+  stat_summary(fun.data = mean_sdl, 
+               fun.args = list(mult = 1),
+               position = posn_d) +
+  scale_y_continuous(limits = c(1,5),
+                     expand = c(0,0))
+```
+
+Compare the two plots above. Do you notice that the error bars are
+different, and that we got a warning message? This is a serious concern!
+Why did the error bars change? This is why I mentioned earlier that you
+should never just apply scale functions without first seeing all of your
+data.
+
+The scale functions will *filter* data that is *outside* of the limits.
+That means that all of the automatically calculated statistics, like the
+mean and standard deviation, will be calculated *only* on that filtered
+dataset. This may be what you want, but it's probably not.
+
+What we really want to do is zoom in on the plot, but not filter the
+data. With this we can use a coordinate function. As you probably
+already expected these all have the form `coord_*()`.
+
+```{r}
+q +
+  stat_summary(fun.data = mean_sdl, 
+               fun.args = list(mult = 1),
+               position = posn_d) +
+  scale_y_continuous(expand = c(0,0)) +
+  coord_cartesian(ylim = c(1,5))
+
+```
+
+## Layer 6 Facets, Small Multiples
+
+Small multiples are implemented with the facet later. Again, they
+following a nice naming convention. Each function follows the form
+`facet_*()`. There are a couple ways in which we can input variables. I
+tend to prefer formula notation: `y ~ x`, Which in this case becomes
+`rows ~ columns`.
+
+When you have a small number of groups in a categorical variable, you
+can use `facet_grid()`. Let's begin with an example:
+
+```{r}
+m <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point()
+
+m
+```
+
+Split by rows:
+
+```{r}
+m + facet_grid(cyl ~ .)
+```
+
+Split by columns:
+
+```{r}
+m + facet_grid(. ~ am)
+```
+
+Split by both:
+
+```{r}
+m + facet_grid(cyl ~ am)
+```
+
+Noticed that cyl and am are numeric. `ggplot2` will convert these to
+factors. If we want to set the order, we should make them factors
+ourselves and properly set the order of the levels. See the Factors
+chapter in the *Data Analysis with R* course for more details.
+
+For many groups, use `facet_wrap()`:
+
+```{r}
+m + facet_wrap(~ gear, ncol = 2)
+```
+
+## Layer 7: Themes, Non-data Ink
+
+The themes layer is where we modify all of the non-data ink on our plot.
+Just like all the other layers the functions here take the form
+`theme_*()`. For example, there are many built-in themes. Probably the
+the most useful is:
+
+```{r}
+p +
+  theme_classic()
+```
+
+But `theme()` allows us to modify any non-data ink element on the plot.
+There are three types of non-data ink: text, lines and rectangles. Each
+element gets an intuitive name, using a `.` notation. The name tells us
+which level of the hierarchy of specific element falls into. All of
+these names are arguments in `theme()`. For example, for text elements:
+
+    theme(
+    text, 
+      axis.title, 
+        axis.title.x,
+          axis.title.x.top, 
+          axis.title.x.bottom, 
+        axis.title.y, 
+          axis.title.y.left,
+          axis.title.y.right, 
+      title, 
+        legend.title, 
+        plot.title,
+        plot.subtitle, 
+        plot.caption, 
+        plot.tag, 
+      axis.text, 
+        axis.text.x, 
+          axis.text.x.top,
+          axis.text.x.bottom, 
+        axis.text.y, 
+          axis.text.y.left, 
+          axis.text.y.right,
+      legend.text,
+      strip.text, 
+        strip.text.x, 
+        strip.text.y)
+
+For line elements:
+
+    theme(
+    line,
+      axis.ticks,
+        axis.ticks.x, 
+          axis.ticks.x.top,
+          axis.ticks.x.bottom,
+        axis.ticks.y,
+          axis.ticks.y.left, 
+          axis.ticks.y.right,
+        axis.line,
+          axis.line.x, 
+            axis.line.x.top,
+            axis.line.x.bottom, 
+          axis.line.y,
+            axis.line.y.left, 
+            axis.line.y.right, 
+      panel.grid,
+        panel.grid.major, 
+          panel.grid.major.x, 
+          panel.grid.major.y, 
+        panel.grid.minor,
+          panel.grid.minor.x,
+          panel.grid.minor.y)
+
+And for rectangle elements:
+
+    theme(
+    rect,
+      legend.background, 
+      legend.key,
+      legend.box.background, 
+      panel.background,
+      panel.border,
+      plot.background, 
+      strip.background, 
+        strip.background.x, 
+        strip.background.y)
+
+To modify an element, just call its argument in `theme()` and apply the
+modification using either `element_text()`, `element_ _line()`, or
+`element_rect()`, depending on the element you are modifying. e.g.
+
+```{r}
+p +
+  theme(axis.text = element_text(colour = "red"))
+```
+
+There is one other element function that we haven't discussed yet:
+`element_blank()`. We can use this in a plot to remove any item. That
+is, it won't be drawn at all. In this example I set all rectangles to
+blank:
+
+```{r}
+p +
+  theme_classic() +
+  theme(rect = element_blank())
+```
+
+Actually, in addition to non-data ink we also modify the position of
+specific elements on the plot, like margins and spacing, in the themes
+layer. The most common modification you may make is to change the
+position of the legend using the `legend.position` argument. This takes
+a character argument, e.g. `"none"` to remove the legend, or `"top"`,
+`"right"`, `"bottom"`, `"left"` to center it on that side of the plot.
+
+```{r}
+p +
+  theme(legend.position = "bottom")
+```
+
+You can position the legend inside the plot by specifying a two-element
+long numeric vector. Specifies the X and Y position of the legend in
+`npc` (Normalised Parent Coordinates) units. These values range from 0
+to 1, where 0 is the min and 1 is the max value of the axis.
+
+```{r}
+p +
+  theme_classic() +
+  theme(legend.position = c(0.85, 0.75))
+```
+
+Of course we can combine this altogether:
+
+```{r}
+p +
+  theme_classic() +
+  theme(rect = element_blank(),
+        axis.text = element_text(colour = "black"),
+        legend.position = c(0.85, 0.75))
+```
+
+# Saving plots
+
+Broadly speaking, there are two types of images: raster & vector.
+
+Raster images have pixels & resolution. Think of the images your camera
+takes. Typical formats include: - jpg - png - tif - gif - bmp
+
+Vector images don't actually contain an image, they just have the
+instructions to make images. Typical formats include: - pdf - ai - svg -
+ps - eps
+
+To save the last active image just run `ggsave()` after you print it to
+the screen.
+
+```{r eval = FALSE}
+ggsave("myPlot.png", width = 6, height = 6, units = "in")
+ggsave("myPlot.pdf", width = 6, height = 6, units = "in")
+```
+
+The extension on the file name will tell `ggsave()` what format to use
+to save the image. If we don't specify a path, it will be saved to the
+working directory. That's why it's always good to work inside of a
+project in RStudio.
+
+If you want to explicitly say which plot to save just specify it as the
+second argument.
+
+```{r eval = FALSE}
+ggsave("myPlot_p.png", p, width = 6, height = 6, units = "in")
+ggsave("myPlot_p.pdf", p, width = 6, height = 6, units = "in")
+```

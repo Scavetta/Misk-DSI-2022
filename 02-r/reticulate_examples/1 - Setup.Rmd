@@ -1,0 +1,92 @@
+---
+title: "Creating a Python virtual environment with Reticulate"
+output: html_document
+---
+
+In this script:
+
+- 0.1: Install & load reticulate
+- 0.2: Check the default Python build
+- 0.3: Create a virtual environment
+- 0.4: Populate the virtual environment
+
+## 0.1: Install & load `reticulate`
+
+```{r eval=FALSE}
+
+# Install, if necessary, then load:
+if (!require(reticulate)) {
+  install.packages("reticulate") 
+  library(reticulate)
+  }
+
+```
+
+Even if you have `anaconda` or `miniconda` installed locally, i.e. not in a Docker container, execute the following `reticulate` command:
+
+```{r eval=FALSE}
+
+# Install miniconda with the default r-reticulate conda env
+# install_miniconda()
+```
+
+Check to see what virtual environments miniconda has available:
+
+```{r eval=FALSE}
+
+# View available conda envs
+conda_list()
+```
+
+You'll see two vonda envs at least:
+
+-   `Base R`
+-   `r-reticulate` with typical DS Python packages (`pandas`, `numpy`, etc.)
+
+## 0.2 - Check the default Python build
+
+Check the default Python build
+
+```{r eval=FALSE}
+
+# Alternatively, use virtualenv
+# virtualenv_create
+# use_virtualenv	
+
+# Specify env or version of pythonb to use with
+# use_python()
+
+# View the current python setup that reticulate will use
+py_config()
+```
+
+## 0.3: Create a virtual environment - OPTIONAL
+
+For our purposes you should need to have to make your own conda env. In my experience there have been some bugs with using various conda envs and virtual environemnts, and switching between them. But if you are interested, you can create a new conda env using: 
+
+```{r}
+
+# Create a new conda env
+# conda_create("misk_dsi")
+
+# See it in the list
+# conda_list()
+```
+
+## 0.4: Populate the virtual environment
+
+The `r-reticulate` conda env will have all the core packages you need for data science, but of course you can install more. Just change the conda env to the desired environment is you are not using the standard r-reticulate.
+
+```{r}
+
+# Install a single package
+conda_install("r-reticulate", "scikit-learn")
+
+# Install multiple packages with purrr::map()
+c("scikit-learn", "pandas", "seaborn") %>%
+  purrr::map(~ conda_install("r-reticulate", .))
+
+# Do the same but with 
+# virtualenv_install()
+# for virtualenv
+```

@@ -1,0 +1,64 @@
+---
+title: "Martian-exercises"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+
+
+# Import data for interactive mode
+# martians <- read_tsv("00-data/martians.txt")
+
+# Import data when document is rendered
+martians <- read_tsv("../00-data/martians.txt")
+```
+
+Above, we compensated for different environments and working directories in interactive mode and during document rendering. **This is not a good solution** in the long terem... see the `{here}` package.
+
+## Exercise 9.8 (Only tall martians)
+
+Use the entire dataset for this exercise, i.e. Site I and Site II. Let the median divide the height variable into lower and upper halfs. Calculate the proportion of blue and red-nosed Martians in each half. Do you think there is a real difference in the proportion of nose colors between the lower and upper 50% of the sample (according to height)?
+
+
+```{r}
+martians %>% 
+  select(Height, Nose) %>% 
+  mutate(Short = Height < median(Height)) %>%  # define the two parts of the dataset
+  group_by(Short, Nose) %>% 
+  summarise(count_nose = n())  %>%
+  # ungroup() %>%
+  # group_by(Short) %>%
+  mutate(prop = prop.table(count_nose)) %>% 
+  ggplot(aes(Short, prop, fill = Nose)) +
+  geom_col() +
+  scale_fill_manual(values = c("Blue" = "light blue", "Red" = "pink"))
+
+# Convenient way to see the groups in a grouped dataframe as a list of dataframes
+# group_split()
+```
+
+Can I get `ggplot2` to calculate the absolute numbers and proportions of groups?
+
+We can use `geom_bar()` to calculate from the raw values, instead of`geom_col()`, which uses pre-calculated values. 
+
+```{r}
+# y = Height
+# x = Site
+H_med <- median(martians$Height)
+
+table(martians$Height < H_med, martians$Nose)
+
+ggplot(martians, aes(Height < H_med, fill = Nose)) +
+  geom_bar() +
+  scale_fill_manual(values = c("Blue" = "light blue", "Red" = "pink")) +
+  NULL
+
+```
+
+
+
+
+## 

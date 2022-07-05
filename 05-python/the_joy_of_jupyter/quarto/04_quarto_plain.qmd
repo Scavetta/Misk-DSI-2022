@@ -1,0 +1,61 @@
+---
+title: "matplotlib demo"
+format:
+  html:
+    code-fold: true
+kernel: python3
+---
+
+For a demonstration of a line plot on a polar axis, see @fig-polar.
+
+```{python}
+#| label: fig-polar
+#| fig-cap: "A line plot on a polar axis"
+#| echo: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+r = np.arange(0, 2, 0.01)
+theta = 2 * np.pi * r
+fig, ax = plt.subplots(
+  subplot_kw = {'projection': 'polar'} 
+)
+ax.plot(theta, r)
+ax.set_rticks([0.5, 1, 1.5, 2])
+ax.grid(True)
+plt.show()
+```
+
+
+
+```{r}
+#| label: fig-ggplot2
+#| fig-cap: "A plot from ggplot2"
+#| echo: false
+
+# An example from class
+# # If the package is not present then install it...
+# if (!require("janitor")) {
+#   install.packages("janitor")
+# }
+# 
+# # initialize it:
+# library(janitor)
+
+# # library
+# library(ggplot2)
+#  
+# # Keep 30 first rows in the mtcars natively available dataset
+# data=head(mtcars, 30)
+#  
+# # 1/ add text with geom_text, use nudge to nudge the text
+# ggplot(data, aes(x=wt, y=mpg)) +
+#   geom_point() + # Show dots
+#   geom_text(
+#     label=rownames(data), 
+#     nudge_x = 0.25, nudge_y = 0.25, 
+#     check_overlap = T
+#   )
+
+```

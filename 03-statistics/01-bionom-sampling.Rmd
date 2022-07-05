@@ -1,0 +1,293 @@
+---
+title: "Uncovering p(success) in the Binomial Distribution"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+```
+
+
+We already saw how a binomial distribution is constructed. e.g. for $n = 2$, and a $p(success) = 0.5$, we have the following distribution:
+
+```{r}
+
+n <- 2
+p <- 0.5
+dist <- dbinom(0:2, n, p)
+
+data.frame(y = dist,
+           x = factor(0:n)) %>% 
+  ggplot(aes(x, y)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1)) +
+  theme_classic()
+```
+
+So what if we have an _empirical_ result, in which we want to uncover $p(success)$ in the population? If we have only 1 sample, with $n = 2$, then how should we get to this? e.g. imagine we draw two individuals.
+
+
+```{r}
+set.seed(138)
+sample <- sample(c(FALSE, TRUE), 2, TRUE)
+sample_prop <- sum(sample)/n 
+
+```
+
+We get: `r sample`. Do we know that p = 0.5? NO! We'd conclude that p = `r sample_prop`! Our distribution would be:
+
+```{r}
+dist <- dbinom(0:2, n, sample_prop)
+
+data.frame(y = dist,
+           x = factor(0:n)) %>% 
+  ggplot(aes(x, y)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1)) +
+  theme_classic()
+```
+
+That doesn't look like the expected theoretical distribution at all! So we haven't uncovered $p(success)$ Ok, so let's keep repeating the experiment. Instead of just 1 sample of 2 individuals, we'll take _many_ samples.
+
+```{r}
+n <- 2
+r <- 10
+
+set.seed(138)
+sample <- rep(n, r) %>% 
+  map_dbl( ~ sum(sample(c(FALSE, TRUE), ., TRUE) ))
+
+data.frame(x = sample) %>% 
+  count(x, name = "results") %>%
+  mutate(results = results/r,
+         x = factor(x)) -> results_table
+
+results_table %>% 
+  kable()
+```
+
+Which would give us a distribution of:
+
+
+```{r}
+results_table %>% 
+  ggplot(aes(x, results)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1)) +
+  theme_classic()
+
+```
+
+Hmm... So that also doesn't look like the distribution we expected. Let's keep going. How about we repeat the experiment 100 times?
+
+```{r}
+
+n <- 2
+r <- 100
+
+set.seed(138)
+sample <- rep(n, r) %>% 
+  map_dbl( ~ sum(sample(c(FALSE, TRUE), ., TRUE) ))
+
+
+data.frame(x = sample) %>% 
+  count(x, name = "results") %>%
+  mutate(results = results/r,
+         x = factor(x)) %>% 
+  ggplot(aes(x, results)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1)) +
+  theme_classic()
+
+```
+
+Better, but still not quite there. How about 1000 times?
+
+```{r}
+
+n <- 2
+r <- 1000
+
+set.seed(138)
+sample <- rep(n, r) %>% 
+  map_dbl( ~ sum(sample(c(FALSE, TRUE), ., TRUE) ))
+
+
+data.frame(x = sample) %>% 
+  count(x, name = "results") %>%
+  mutate(results = results/r,
+         x = factor(x)) %>% 
+  ggplot(aes(x, results)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1)) +
+  theme_classic()
+
+```
+
+Wow, now we're getting somewhere. our emperical distribution looks very close to the theoretical distributuion. Let's try even more! How about 10,000?
+
+
+```{r}
+
+n <- 2
+r <- 10000
+
+set.seed(138)
+sample <- rep(n, r) %>% 
+  map_dbl( ~ sum(sample(c(FALSE, TRUE), ., TRUE) ))
+
+
+data.frame(x = sample) %>% 
+  count(x, name = "results") %>%
+  mutate(results = results/r,
+         x = factor(x)) %>% 
+  ggplot(aes(x, results)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1)) +
+  theme_classic()
+
+```
+
+It doesn't look that much different than with 1000, but that's fine bcause we uncovered the _true_ underlying distribution. In this case we knew the theoretical distribution because we made it! But in reality you don't know that distribution.
+
+Let's try it again with differnt values. Imagine we have a large population with some real proportion of some "success", i.e. a choice from 1 of two (binary) outcomes. In this case "blue noses".
+
+```{r}
+#
+set.seed(136)
+population <- sample(c("Blue", "Red"), 10^6, T, c(0.86, 0.14))
+
+# True proportion of blue nosed martians:
+
+prop_blue <- sum(population == "Blue")/length(population)
+
+```
+
+In our population, the _true_ proportion of successes is `r prop_blue`. Thus if we have a large sample, like n = 100. The _true_ binomial distribution looks like:
+
+```{r}
+library(tidyverse)
+data.frame(y = dbinom(0:100, 100, prop_blue),
+           x = 0:100) %>% 
+  ggplot(aes(x, y)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, xlim = c(0,100), ylim = c(0,1)) +
+  theme_classic()
+```
+
+What would happen if we were to draw a single sample? Would we end up on the _true_ proportion of successes that we have in the population? Probably not!
+
+```{r}
+# The sample size
+n <- 10
+
+prop_blue_sample_1 <- sum(sample(population, n) == "Blue")/n
+```
+
+So we drew `r n` observations for a single sample and concluded that the proportion of success is `r prop_blue_sample_1`. Well, first off we had a pretty small sample, so we don't even have the ability to get the precision needed for this, so let's try and make it larger:
+
+```{r}
+# The sample size
+n <- 100
+
+set.seed(138)
+prop_blue_sample_2 <- sum(sample(population, n) == "Blue")/n
+
+```
+
+
+This time we discover that the proportion of successes is `r prop_blue_sample_2`. Which is still not the _true_ value. We can increase this value more and more and more, but we would still only have a single result. If we plot the histogram of our distribution, we'd just have:
+
+```{r}
+data.frame(y = 1,
+           x = prop_blue_sample_2*100) %>% 
+  ggplot(aes(x, y)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, xlim = c(0,100), ylim = c(0,1)) +
+  theme_classic()
+```
+
+```{r}
+# The proportion of blue noses in each sample of n = 100
+
+# The sample size
+n <- 100
+
+# The number of repeated samples we take:
+r <- 10
+
+sample_prop <- rep(100, 10) %>% 
+  map_dbl( ~ sum(sample(population, .) == "Blue")/length(sample(population, .)))
+
+# now just take the average of all these values
+# mean(sample_prop)
+
+```
+
+Draw 10 samples samples:
+
+```{r}
+
+n <- 100
+r <- 10
+
+set.seed(138)
+sample <- rep(n, r) %>% 
+  map_dbl( ~ sum(sample(population, ., TRUE) == "Blue"))
+
+data.frame(x = sample) %>% 
+  count(x, name = "results") %>%
+  mutate(results = results/r) %>% 
+  ggplot(aes(x, results)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1), xlim = c(0,100)) +
+  theme_classic()
+
+```
+
+Yikes! What did that tell us about the true $p(success)$? Not much, I guess. Let's draw 10000 samples:
+
+```{r}
+
+n <- 100
+r <- 10000
+
+set.seed(138)
+sample <- rep(n, r) %>% 
+  map_dbl( ~ sum(sample(population, ., TRUE) == "Blue"))
+
+data.frame(x = sample) %>% 
+  count(x, name = "results") %>%
+  mutate(results = results/r) -> results_table
+
+p_guess <- results_table$x[which.max(results_table$results)]/n
+
+results_table %>% 
+  ggplot(aes(x, results)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0, ylim = c(0,1), xlim = c(0,100)) +
+  theme_classic()
+```
+
+Alright, now we're getting somewhere. This looks much more like the theoretical distribution. We may decide that we can just take the mean of all the results, `r mean(sample/n)`. That would get us close, but if the distribution is skewed, i.e. not symmetrical, then it's not appropriate. All we can say is that we've uncovered the underlying theoretical distribution. What's $p(success)$? We'll if we choose the most frequent result, we'd say `r p_guess`, but it's clear that this suffers from a lack of precision (decimal places). If we had a much larger sample size we'd be able to get a more precise measure.
+
+In simulations, we can repeat the experiment over and over and over as much as we'd like, with whatever n we choose. But in reality, we only get **1** sample! So how can we get to the same solution with out repeating the experiment _ad infinitum_? That's the toic of estimation.
+
+
+
+
+
+
+

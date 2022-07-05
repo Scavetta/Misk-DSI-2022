@@ -1,0 +1,174 @@
+---
+title: "Calculating the Martian 95% CI"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+
+# Load packages
+library(tidyverse)
+library(MASS)
+```
+
+In class we had a quiz question: "A friend tells me that she has flipped a coin 48 times and got 48 heads in a row!" One of the responses was: "the 1 chance in 281 475 000 000 000. How was that calculated?
+
+```{r echo=TRUE}
+# Number of trials, individuals, tosses:
+n <- 48
+
+# The ASSUMED probability of success p(success):
+p <- 0.5
+
+# Calculate all the values for the binom distribution
+myProb <- dbinom(x = 0:n, 
+       size = n,
+       prob = p)
+  
+
+# the probability of getting 48 successes:
+1/myProb[n+1]
+```
+
+
+```{r eval=FALSE}
+# Or we can directly calculate it:
+# you have a 1 in...
+1/0.5^n
+# chance to get all successes
+```
+
+You have a 1 in `r 1/0.5^n` chance to get all successes.
+
+Does this tell us that the p(success) is 1.0? NO! It can be many values, so we can never say for sure. e.g.:
+
+```{r}
+# Number of trials
+n <- 48
+
+# Probability of a success:
+p <- 0.98
+
+# Calculate the binom
+dist <- dbinom(0:n, n, p)
+
+# plot it:
+data.frame(y = dist,
+           x = factor(0:n)) %>% 
+  ggplot(aes(x, y)) +
+  geom_col() +
+  labs(x = "number of successes", y = "probability") +
+  coord_cartesian(expand = 0) +
+  theme_classic()
+```
+
+Even if the p(success) was only 0.98 we'd still not be surprised to get 48 successes, so we can't ever really saw that it's 1.0.
+
+## The Central Limit Theorem
+
+### From a Normal population
+
+```{r}
+# Make a Normally-distributed population
+set.seed(136)
+population <- rnorm(10^7, mean = 200, sd = 6)
+hist(population, breaks = 100, main = "A normally-distributed population")
+```
+
+Take a single sample:
+
+```{r}
+n <- 30
+
+sample_1 <- sample(population, size = n, replace = TRUE)
+
+hist(sample_1)
+
+```
+
+Actually, we're not that interested in the distribution of the sample for the purpose of estimation of the mean $\mu$!
+
+What we're really intersted in is the distribution of the sample means!! i.e. that which is described by the Central Limit Theorem!
+
+```{r}
+n <- 3
+r <- 30000
+# Take r samples, each having n observations:
+sample_means <- rep(n, r) %>% 
+  map_dbl( ~  mean(sample(population, size = ., replace = TRUE)) )
+# plot them:
+hist(sample_means, breaks = 100)
+# By definition, the sample means will always be
+# Normal, even with a small n, if the parental
+# distribution is Normal
+```
+
+By definition, this will be Normal, if the parental population distribution is Normal 
+
+Is this right? We have a dataset:
+
+1. We plot a variable
+2. if the plot reflects a normal distribution
+3. we go with SEM to help us determine what is usual and unusual (i.e. extreme values)
+
+Ok, so what does the plot of the sample tell us?
+
+## Positively skewed distribution
+
+```{r}
+population <- rf(10^7, 1, 50)
+population <- population[population < 3]
+hist(population, breaks = 100, main = "a positively-skewed distribution")
+```
+
+Take a single sample:
+
+```{r}
+n <- 15
+
+sample_1 <- sample(population, size = n, replace = TRUE)
+
+hist(sample_1)
+
+```
+This sample is NOT symmetrical, not is it anything like a Normal. Which is fine! BUT this does tell us that the MEAN and the SD are NOT going to be interesting metrics to calculate!
+
+
+As an aside: Body and brain weights. Does it make sense to look at the mean of this variable?
+
+
+```{r}
+# the mammals dataframe, from the MASS package:
+
+ggplot(mammals, aes(brain)) +
+  geom_histogram()
+
+```
+NO! becaus it's positively skewed. BUT... that doesn't mean that we can't claim that the Central Limit Theorem doesn't hold true. IF we have a large sample size, then the distrbution of the sample means will be Normal, according toth e CLT.
+
+```{r}
+n <- 300
+r <- 30000
+sample_means <- rep(n, r) %>% 
+  map_dbl( ~  mean(sample(population, size = ., replace = TRUE)) )
+# plot it:
+hist(sample_means, breaks = 100)
+# Here, you MUST have a large sample size (n)
+# To overcome the "strangeness" (i.e. non-Normal)
+# of the parental distribution (generally min. 30 obs)
+```
+
+So when we talk about "the assumption of Normality", what we really mean is the CLT, and not the sample! We do want to know the dist of the sample, because that will tell us of the mean and SD are even useful metrics.
+
+So what can we do if we have a skewed distribution? You're likely to transform this distribution. (somewhat controversal, because you no longer operate on the original scale!)
+
+```{r}
+# Transform
+mammals$brain_log10 <- log10(mammals$brain)
+
+ggplot(mammals, aes(brain_log10)) +
+  geom_histogram()
+
+```
+
+But... this is something where the mean and the sd are more useful to consider.

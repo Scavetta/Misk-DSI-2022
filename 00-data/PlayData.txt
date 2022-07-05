@@ -1,0 +1,5 @@
+type	time	height	width
+A	1	10	50
+A	2	20	60
+B	1	30	70
+B	2	40	80

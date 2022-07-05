@@ -1,0 +1,110 @@
+---
+title: "The Standard Normal Distribution (N(0,1)) and Z-scores"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+```
+
+## Site I
+
+```{r}
+mu_1 <- 200
+sigma_1 <- 6
+mu_2 <- 210
+sigma_2 <- 1
+```
+
+95% of the Martians at Site I ($\mu$ = `r mu_1` $\sigma$ = `r sigma_1`) are expected to have a height between `r mu_1 + c(-1.96,1.96)*(sigma_1)` 
+
+## Site II
+
+95% of the Martians at Site II ($\mu$ = `r mu_2` $\sigma$ = `r sigma_2`) are expected to have a height between `r mu_2 + c(-1.96,1.96)*(sigma_2)` 
+
+## Diagram
+
+"one value, two curves" - One country, two policies
+
+```{r}
+# Number of points on the distribution to calculate:
+n_points <- 5000
+
+# Construct plot
+base_plot <- ggplot() + 
+  geom_function(aes(color = "Site I"), fun = dnorm, args = list(mean = mu_1, sd = sigma_1), n = n_points) +
+  geom_function(aes(color = "Site II"), fun = dnorm, args = list(mean = mu_2, sd = sigma_2), n = n_points) +
+  coord_cartesian(expand = 0) +
+  xlim(180, 220) +
+  labs(color = "Location", x = "Height (cm)") +
+  theme_classic() +
+  theme(line = element_blank())
+
+# Display plot:
+#base_plot
+```
+
+Plotting the Mystery Martian:
+
+```{r}
+base_plot +
+  geom_vline(aes(xintercept = 215))
+```
+
+## Calculating Z-scores
+
+### Site I 
+
+Calculating Z--scores for the Martian height at site I.
+
+| $x_i (cm)$  | `r mu_1 - 3*sigma_1` | `r mu_1 - 2*sigma_1` | `r mu_1 - sigma_1` | `r mu_1` | `r mu_1 + sigma_1` | `r mu_1 + 2*sigma_1` | `r mu_1 + 3*sigma_1` |
+|-------------|-----------------------------|-----------------------------|---------------------------|----------------|---------------------------|-----------------------------|-----------------------------| 
+| $x_i - \mu$ |         -18                    |        -12                     |           -6                |         0       |              6             |               12              |                  18           |  
+| $z_i$       |           -3                  |           -2                  |           -1                |         0       |             1              |              2               |                3             |
+
+The Z--score for the Mystery martian at site I is: (215 - `r mu_1`)/`r sigma_1` = `r  (215 - mu_1)/sigma_1`.
+
+### Site II
+
+Calculating Z--scores for the Martian height at Site II
+
+| $x_i (cm)$  | `r mu_2 - 3*1` | `r mu_2 - 2*1` | `r mu_2 - 1` | `r mu_2` | `r mu_2 + 1` | `r mu_2 + 2*1` | `r mu_2 + 3*1` |
+|-------------|----------------------|----------------------|--------------------|----------------|--------------------|----------------------|----------------------| 
+| $x_i - \mu$ |         -3             |            -2          |             -1      |      0          |                1    |           2           |           3           |  
+| $z_i$       |           -3                  |           -2                  |           -1                |         0       |             1              |              2               |                3             |
+
+The Z--score for the Mystery martian at site II is: (215 - `r mu_2`)/`r sigma_2` = `r  (215 - mu_2)/sigma_2`.
+
+Z--scores are a _standardized_ score that tells us how many standard deviations (i.e. $\sigma$) any given value $x_i$ is away from the mean (i.e. $\mu$).
+
+## The Standard Normal Distribution
+
+Z--Scores are described by the Standard Normal Distribution, N($\mu$ = 0, $\sigma$ = 1). Thus an _extreme_ value is outside the interval [-1.96, 1.96] since values outside this range are less than 5% likely to be observed?
+
+Z--Scores are our first experience with one of the most important equations in all of statistics: **signal:noise**. Here, signal: $x_i - \mu$, noise: $\sigma$.
+
+"one curve, two values" - Lord of the rings model "One curve to rule them all".
+
+```{r}
+# Number of points on the distribution to calculate:
+n_points <- 5000
+
+# Construct plot
+base_plot <- ggplot() + 
+  geom_function(aes(color = "The Standard\nNormal\nDistribution"), fun = dnorm, args = list(mean = 0, sd = 1), n = n_points) +
+  geom_vline(aes(xintercept = 2.5, color = "Z--score for\nMystery Martian\nat Site I")) +
+  geom_vline(aes(xintercept = 5.0, color = "Z--score for\nMystery Martian\nat Site II")) +
+
+  coord_cartesian(expand = 0) +
+  xlim(-6, 6) +
+  labs(color = "", x = "Z-score") +
+  theme_classic() +
+  theme(line = element_blank())
+
+# Display plot:
+base_plot
+```
+
+
+

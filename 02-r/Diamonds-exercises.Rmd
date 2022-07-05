@@ -1,0 +1,284 @@
+---
+title: "Diamonds exercises"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+## The `diamonds` Dataset
+
+Exercise 9.1 (Examine structure)
+
+- What type of data is contained in each column?
+
+- Use some of the functions we introduced in the dataframes section to explore the basic structure of our new object.
+
+The dataset contains the following variables:
+
+```{r ex9_1, echo=FALSE}
+# Variable names
+# names(diamonds)
+
+# A compact view
+glimpse(diamonds)
+
+# Summary statistics
+# summary(diamonds)
+```
+
+Our data:
+
+```{r}
+diamonds
+```
+
+## Exercise 9.2 (Counting individual groups)
+
+How many diamonds with a clarity of category "IF" are present in the dataset?
+
+```{r}
+(num_IF <- sum(diamonds$clarity == "IF"))
+
+diamonds %>% 
+  group_by(clarity) %>% 
+  count()
+
+table(diamonds$clarity)
+
+table(diamonds$clarity, diamonds$color)
+```
+
+A: From a total of `r nrow(diamonds)` diamonds, there are `r num_IF` IF clarity diamonds in our dataset.
+
+## Exercise 9.3 (Measuring proportions)
+
+- What proportion (0-1) (or percentage (0-100)) of the total do they represent?
+
+```{r}
+num_IF / nrow(diamonds) # proportion
+
+num_IF / nrow(diamonds) * 100 # percent
+```
+
+## Exercise 9.4 (Summarizing proportions)
+
+- What proportion of the whole is made up of each category of clarity?
+
+```{r echo=FALSE}
+
+diamonds %>%
+  count(clarity) %>%
+  mutate(
+    # n_ = n(), # 8, n from input, not diamons
+    # n_row = nrow(diamonds),
+    prop = n/nrow(diamonds)) %>% 
+  knitr::kable(caption = "The proportion of each type of clarity diamond.")
+
+# Longer form:
+diamonds %>% 
+  group_by(clarity) %>% 
+  summarise(n = n()/nrow(diamonds)) 
+  
+# The intersection of two variables (as a data.frame)
+# with grouping by clarity
+diamonds %>% 
+  group_by(clarity, color) %>% 
+  summarise(n = n())
+
+# A contigency table (not a data.frame object)
+table(diamonds$clarity, diamonds$color)
+
+table(diamonds$clarity) / length(diamonds$clarity)
+table(diamonds$clarity) / nrow(diamonds)
+
+```
+
+## Exercise 9.5 (Finding prices I)
+
+- What is the cheapest diamond price overall?
+
+```{r}
+min(diamonds$price)
+```
+
+- What are the properties of the cheapest and the most expensive diamonds?
+
+```{r}
+which.min(diamonds$price)
+
+# use to find the rest of the values:
+# Hard coding :(
+diamonds %>% 
+  slice(1)
+
+# Integrated
+# By index position
+diamonds %>% 
+  slice(which.min(price), which.max(price)) %>%
+  # select(-price) %>%
+  print()
+
+# By logical vector
+diamonds %>%
+  filter(price == min(price) | price == max(price)) %>%
+  # select(-price) %>% 
+  print()
+
+# Although it worked, try to not use !price to _not_ select
+# a column. Use it for negation in logical expressions:
+diamonds %>% 
+  filter(price < 500)
+# The negation
+diamonds %>% 
+  filter(!(price < 500))
+```
+
+## Exercise 9.6 (Finding prices I)
+
+- What is the range (single number, Q4-Q0) of diamond prices?
+
+```{r}
+# As a vector
+diff(range(diamonds$price))
+
+# As a data.frame (tibble)
+diamonds %>%
+  summarise(singleRange = max(price) - min(price))
+```
+
+- The min & max, separately, for each category of cut and color? How would you describe what the results show? (kind of difficult)
+
+```{r}
+table(diamonds$cut, diamonds$color)
+
+# 4 variables: cut, color, min, max
+# dim: 35 x 4
+diamonds %>% 
+  group_by(cut, color) %>% 
+  summarise(min = min(price),
+            max = max(price)) -> dia_range_2_col
+dia_range_2_col
+
+# pivot, specity var to exclude
+dia_range_2_col %>% 
+  pivot_longer(-c(cut, color))
+
+# pivot, specity var to include
+dia_range_2_col %>% 
+  pivot_longer(c(min, max))
+
+# 3 variables cut, color, range
+# dim: 70 x 3
+diamonds %>% 
+  group_by(cut, color) %>% 
+  summarise(range = range(price)) -> dia_range_1_col
+dia_range_1_col
+
+# Add a column for defining which value is max and min
+dia_range_1_col %>% 
+  mutate(metric = c("min", "max")) -> dia_range_1_col_ID
+```
+
+- Produce a plot from the previous exercise. Does this change how you would summarize the previous result?
+
+y ~ x plots are typically described as dependent variable ~ independent variable, $y = f(x)$ 
+
+Ideas:
+- A bar plot: where for entry, we have two bars one min and one vor max
+  - x-axis: categorical, here cut or color, or both
+  - y-axis: continuous, here min or max, or both
+- A box-plot: i.e. using the entire dataset. (will see later)
+- A heat map (categorical x & y): x = cuts, y = colors, intersection is colored according to the value of a continuous variable (i.e. min or max). (e.g. )
+
+```{r}
+# Define position for dots in plots:
+posn_d <- position_dodge(width = 0.25)
+# But can also use position = "dodge"
+
+# Define the data and aesthetics  
+ggplot(dia_range_1_col, aes(cut, range, color = color)) + geom_point(position = posn_d) +
+  # geom_path() +
+  # geom_line() +
+  # scale_color_brewer() +
+  NULL
+
+# try with 2 col, but we'd need two ploting functions:
+ggplot(dia_range_2_col, aes(cut, min, color = color)) +
+  geom_point(position = posn_d) +
+  NULL
+ggplot(dia_range_2_col, aes(cut, max, color = color)) +
+  geom_point(position = posn_d) +
+  NULL
+
+# Use IDs for each value:
+ggplot(dia_range_1_col_ID, aes(cut, range, color = color)) +
+  geom_point(position = posn_d) +
+  # geom_path() +
+  # geom_line() +
+  facet_grid(metric ~ ., scales = "free_y") +
+  NULL
+
+
+# Avoid bar plots in this case
+# More appropriate for absolute counts
+# geom_jitter() # add random noise on x
+# geom_col(color = "red") # default position = "stack"
+# We can define aes in a geom_ but it doesn't help here:
+  # geom_point(aes(y = max)) +
+```
+
+## Exercise 9.7 (Finding prices II)
+
+- What is the average diamond price in each category of cut and color?
+
+```{r}
+
+```
+
+- Plot the raw values for each of the above groups _and_ the mean and standard deviation.
+
+```{r}
+
+```
+
+- Are boxplots useful when representing this data?
+
+```{r}
+
+```
+
+## Exercise 9.8 (Plotting)
+
+- Produce a plot that shows the relationship between the size of a diamond (as measured by carat) and the price. 
+
+```{r}
+
+```
+
+- Is a transformation of either axis in order? How would you apply it?
+
+```{r}
+
+```
+
+- How can we distinguish between different groups of categorical variables, such as cut, clarity or color? 
+
+```{r}
+
+```
+
+- How about other continuous variables? 
+
+```{r}
+diamonds %>% 
+  group_by(cut, color) %>% 
+  summarise(min = min(price),
+            max = max(price)) %>% 
+  # data.frame() %>% 
+  
+  print()
+```

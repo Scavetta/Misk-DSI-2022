@@ -1,0 +1,76 @@
+---
+title: "Calculating the Martian 95% CI"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load packages
+library(tidyverse)
+
+# Read in the data
+martians <- read_tsv("./00-data/martians.txt")
+```
+
+## Descriptive statistics
+
+```{r}
+# Data
+martian_siteI <- martians$Height[martians$Site == "Site I"]
+
+# n - 10
+n <- length(martian_siteI)
+
+# Mean - 200
+siteI_mean <- sum(martian_siteI)/n
+
+# Variance - 36
+siteI_var <- sum((martian_siteI - siteI_mean)^2)/(length(martian_siteI) - 1)
+
+# Standard deviation - 6
+siteI_sd <- sqrt(siteI_var)
+
+```
+
+```{r}
+n
+```
+
+
+```{r}
+siteI_mean
+```
+
+```{r}
+siteI_sd
+```
+
+## 95% CI
+
+```{r}
+n # n, 10
+siteI_sd # s in place of sigma, 5.995369 (or use 6)
+siteI_mean  # x-bar, 200
+
+
+# SEM, 1.895902
+SEM <- siteI_sd/sqrt(n)
+
+# 95% CI, [196.28, 203.72]
+CI_lower <- siteI_mean - (1.96 * SEM)
+CI_upper <- siteI_mean + (1.96 * SEM)
+
+```
+
+There is a 95% chance that interval [`r CI_lower`, `r CI_upper`] _covers_ the true population parameter $\mu$.
+
+
+```{r}
+# According to the CLT, 95% of x_bar will be found:
+H_0 <- 195
+CLT_lower <- H_0 - (1.96 * SEM)
+CLT_upper <- H_0 + (1.96 * SEM)
+```
+
+
