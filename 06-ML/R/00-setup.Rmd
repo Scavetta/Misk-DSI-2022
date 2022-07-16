@@ -1,0 +1,46 @@
+---
+title: "Environment Setup"
+output:
+  html_document:
+    df_print: paged
+---
+
+## Setting up your environment
+
+The following packages will be used:
+
+```{r}
+list_of_pkgs <- c(
+  "AmesHousing",   # provides data we'll use
+  "dslabs",        # provides mnist data
+  "tidyverse",     # data munging & visualization
+  "reshape2",      # data transformation for one example
+  "extracat",      # visualizing missing data (one example)
+  "factoextra",    # clustering & PCA visualizations
+  "here",          # coordinating paths
+  "rsample",       # sampling procedures
+  "modeldata",     # more data
+  "recipes",       # feature engineering procedures
+  "caret",         # meta modeling package,
+  "h2o",           # meta modeling, model stacking, & auto ML
+  "glmnet",        # regularized regression
+  "earth",         # multivariate adaptive regression splines
+  "ranger",        # fast random forest
+  "gbm",           # gradient boosting machines
+  "xgboost",       # extreme gradient boosting
+  "broom",         # provides model result clean up
+  "vip",           # model interpretation
+  "pdp",           # model interpretation
+  "plotROC",       # plotting ROC curve
+  "rprojroot",      # coordinating paths
+  "tidymodels",
+  "kknn"
+)
+```
+
+Run the following line of code to install the packages you currently do not have:
+
+```{r}
+new_pkgs <- list_of_pkgs[!(list_of_pkgs %in% installed.packages()[,"Package"])]
+if (length(new_pkgs)) install.packages(new_pkgs)
+```

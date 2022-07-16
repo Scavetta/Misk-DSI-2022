@@ -1,0 +1,262 @@
+---
+title: 'Module 02: Modeling Process'
+output:
+  html_document:
+    df_print: paged
+---
+
+# Prerequisites
+
+This module leverages the following packages.
+
+```{r}
+# Helper packages
+# library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+
+# Modeling process
+library(kknn)
+library(tidymodels)
+```
+
+
+Data required
+```{r}
+# Ames housing data
+ames = read_csv("../data/ames.csv")
+
+# Job attrition data
+attrition = read_csv("../data/attrition.csv")
+```
+
+
+# Data splitting
+
+## Simple random sampling
+
+```{r}
+# create train/test split
+set.seed(123)  # for reproducibility
+split  <- initial_split(ames, prop = 0.7)
+train  <- training(split)
+test   <- testing(split)
+
+# dimensions of training data
+dim(train)
+```
+
+```{r}
+# hist(train$Sale_Price)
+ggplot(train, aes(Sale_Price)) +
+ geom_density(color = "blue") +
+ geom_density(data = test, color = "red") +
+ ggtitle("Random sampling with R")
+```
+
+
+## Stratified sampling
+
+```{r}
+set.seed(123)
+split_strat <- initial_split(attrition, prop = 0.7, strata = "Attrition")
+train_strat <- training(split_strat)
+test_strat  <- testing(split_strat)
+```
+
+```{r}
+# orginal response distribution
+table(attrition$Attrition) %>% prop.table()
+
+# response distribution for training data
+table(train_strat$Attrition) %>% prop.table()
+
+# response distribution for test data
+table(test_strat$Attrition) %>% prop.table()
+```
+
+
+# Creating models
+
+```{r}
+knn <- nearest_neighbor(neighbors = 10) %>%
+  set_engine("kknn") %>%
+  set_mode("regression")
+
+m1 <- fit(knn, formula = Sale_Price ~ Gr_Liv_Area + Year_Built, data = train)
+
+m1
+```
+
+```{r}
+# m1 %>% predict(new_data = train %>% 
+#                              select(Gr_Liv_Area, Year_Built))
+# This is equivalent to selecting the features used in building the model
+m1 %>% predict(new_data = train)
+```
+
+
+# Evaluating models
+
+## Regression model
+
+```{r}
+m1
+```
+
+```{r}
+pred <- m1 %>%  predict(new_data = train)
+
+# MAE:
+# sum(abs(train$Sale_Price - pred$.pred))/nrow(train) # fix error
+# 26868.77
+
+# MSE:
+# sum((train$Sale_Price - pred$.pred)^2)/nrow(train)  # fix error
+# 1620084976
+
+#RMSE
+rmse_vec(truth = train$Sale_Price, estimate = pred$.pred)
+# 32913.04
+```
+
+## Classification model
+
+```{r}
+# convert response variable to a factor
+train_strat$Attrition <- as.factor(train_strat$Attrition)
+
+# fit model to attrition data
+m2 <- nearest_neighbor(neighbors = 10) %>%
+  set_engine("kknn") %>%
+  set_mode("classification") %>%
+  fit(Attrition ~ DistanceFromHome, data = train_strat)
+
+# make predictions
+pred <- m2 %>%  predict(new_data = train_strat, type = "prob")
+
+# compute AUC
+roc_auc_vec(truth = train_strat$Attrition, estimate = pred$.pred_Yes, event_level = "second")
+```
+
+
+# Resampling
+
+```{r}
+# create 10 fold CV object
+kfold <- vfold_cv(train, v = 10)
+results <- fit_resamples(knn, Sale_Price ~ Gr_Liv_Area + Year_Built, kfold)
+
+# see RMSE for all folds
+collect_metrics(results, summarize = FALSE) %>% filter(.metric == "rmse")
+
+# average RMSE
+collect_metrics(results, summarize = TRUE)
+# 40548
+```
+
+```{r}
+# 10 fold cross validation repated 5 times (total of 50 folds)
+rfk <- vfold_cv(train, v = 10, repeats = 5)
+results <- fit_resamples(knn, Sale_Price ~ Gr_Liv_Area + Year_Built, rfk)
+
+# see RMSE for all folds
+collect_metrics(results, summarize = FALSE) %>% filter(.metric == "rmse")
+
+# average RMSE
+collect_metrics(results, summarize = TRUE)
+# 40515
+```
+
+
+# Hyperparameter tuning
+
+```{r}
+# model object
+knn <- nearest_neighbor(neighbors = tune()) %>%
+  set_engine("kknn") %>%
+  set_mode("regression")
+
+# Create grid of hyperparameter values
+hyper_grid <- expand.grid(neighbors = seq(2, 25, by = 1))
+
+# model recipe
+model_form <- recipe(Sale_Price ~ Gr_Liv_Area + Year_Built, data = train)
+
+# Tune a knn model using grid search
+results <- tune_grid(knn, model_form, resamples = kfold, grid = hyper_grid)
+
+show_best(results, metric = "rmse")
+# 40212.66
+```
+
+```{r}
+results %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  ggplot(aes(neighbors, mean)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "k", y = "RMSE", title = "Cross validated grid search results")
+```
+
+# Putting the process together
+
+```{r}
+# create train/test split
+set.seed(123)  # for reproducibility
+split  <- initial_split(ames, prop = 0.7)
+train  <- training(split)
+test   <- testing(split)
+
+# select only numeric features
+train <- train %>% select_if(is.numeric)
+
+# model object
+knn <- nearest_neighbor(neighbors = tune()) %>%
+  set_engine("kknn") %>%
+  set_mode("regression")
+
+# Create grid of hyperparameter values
+hyper_grid <- expand.grid(neighbors = seq(2, 25, by = 1))
+
+# create 10 fold CV object
+kfold <- vfold_cv(train, v = 10)
+
+# model recipe - Sale price is a function of all numeric features
+model_form <- recipe(Sale_Price ~ ., data = train)
+
+# Tune a knn model using grid search
+results <- tune_grid(knn, model_form, resamples = kfold, grid = hyper_grid)
+
+# best model
+show_best(results, metric = "rmse")
+
+# plot results
+results %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  ggplot(aes(neighbors, mean)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "k", y = "RMSE", title = "Cross validated grid search results")
+```
+
+# Exercises
+
+1. Load the Boston housing data set and split it into a training set and test set using a 70-30% split.
+
+   - How many observations are in the training set and test set?
+   - Compare the distribution of `cmedv` between the training set and test set.
+
+2. Fit a KNN model where $k=5$ that uses all available features to predict `cmedv`. How does the MSE/RMSE compare across these models?
+
+3. Perform a 10-fold cross-validated KNN model, repeated 5 times, that uses all available features to predict `cmedv`. 
+
+   - What is the average RMSE across all 50 model iterations?
+   - Plot the distribution of the RMSE across all 50 model iterations.
+   - Describe the results.
+
+4. Now perform a hyperparameter grid search where _k_ ranges from 2--20 and apply 10-fold CV repeated 5 times.

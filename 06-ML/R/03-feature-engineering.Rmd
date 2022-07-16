@@ -1,0 +1,287 @@
+---
+title: "Feature & Target Engineering"
+output: html_notebook
+---
+
+# Prerequisites 
+
+```{r}
+# Helper packages
+library(tidyverse)
+library(naniar)
+
+# Modeling process
+library(tidymodels)
+```
+
+```{r}
+# Ames housing data
+ames = read_csv("../data/ames.csv")
+
+# create training/test split
+set.seed(123)
+split  <- initial_split(ames, prop = 0.7, strata = "Sale_Price")
+train  <- training(split)
+test   <- testing(split)
+```
+
+# Target engineering 
+
+```{r engineering-y_log}
+# log transformation
+ames_recipe <- recipe(Sale_Price ~ ., data = train) %>%
+  step_log(all_outcomes())
+
+ames_recipe
+```
+
+# Dealing with missingness
+
+## Visualizing missing values 
+
+```{r}
+ames_raw <- read_csv("../data/ames_raw.csv")
+
+# total missing values
+sum(is.na(ames_raw))
+```
+
+```{r, fig.width=9}
+# can you identify patterns of missing data?
+# missingness is represented with black
+vis_miss(ames_raw)
+```
+
+```{r, fig.height=6}
+# which features have most missing?
+gg_miss_var(ames_raw)
+```
+
+
+## Imputation 
+
+### Estimated statistic 
+
+```{r engineering-mean-impute, eval=FALSE}
+# median imputation to all features
+a <- ames_recipe %>%
+  step_medianimpute(all_predictors())
+
+# median imputation to just numeric predictors
+b <- ames_recipe %>%
+  step_medianimpute(all_predictors(), all_numeric())
+
+# median imputation to 1 or more features
+c <- ames_recipe %>%
+  step_medianimpute(Gr_Liv_Area)
+```
+
+
+### K-nearest neighbor 
+
+```{r engineering-knn-impute}
+knn_imp <- ames_recipe %>%
+  step_knnimpute(all_predictors(), neighbors = 6)
+```
+
+### Tree-based {.tabset}
+
+```{r engineering-bagging-impute}
+ames_recipe %>%
+  step_bagimpute(all_predictors())
+```
+
+
+# Feature filtering 
+
+```{r}
+nzv <- ames_recipe %>%
+  step_nzv(all_predictors(), unique_cut = 10) # threshold as % (10%)
+```
+
+# Numeric feature engineering
+
+## Skewness 
+
+```{r engineering-normalizing}
+# Normalize all numeric features
+X_norm <- ames_recipe %>%
+  step_YeoJohnson(all_predictors(), all_numeric())                 
+```
+
+## Standardization {.tabset}
+
+```{r engineering-standardizing-recipes}
+# standardize all numeric features
+std <- ames_recipe %>%
+  step_center(predictors(), all_numeric()) %>%
+  step_scale(predictors(), all_numeric())
+```
+
+
+# Categorical feature engineering
+
+## One-hot & dummy encoding {.tabset}
+
+```{r engineering-tbd2}
+# one-hot encode
+ohe <- ames_recipe %>%
+  step_dummy(all_nominal(), one_hot = TRUE)
+
+# dummy encode
+de <- ames_recipe %>%
+  step_dummy(all_nominal(), one_hot = FALSE)
+```
+
+
+## Label encoding 
+
+```{r}
+# Label encode a single column
+lbl <- ames_recipe %>%
+  step_integer(MS_SubClass)
+```
+
+## Ordinal encoding 
+
+```{r}
+# specify levels in order
+lvls <- c("Very_Poor", "Poor", "Fair", "Below_Average", "Average", "Typical", 
+          "Above_Average", "Good", "Very_Good", "Excellent", "Very_Excellent")
+
+# apply ordinal encoding to quality features
+ord_lbl <- ames_recipe %>%
+  # 1. convert quality features to factors
+  step_string2factor(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"),
+    levels = lvls
+    ) %>% 
+  # 2. convert any missed levels (i.e. no_pool, no_garage,) to "None"
+  step_unknown(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"), 
+    new_level = "None"
+    ) %>%
+  # 3. move "None" level to front ('None', 'Very_Poor', ..., 'Very_Excellent')
+  step_relevel(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"), 
+    ref_level = "None"
+    ) %>%
+  step_integer(ends_with("Qual"), ends_with("QC"), ends_with("_Cond"))
+```
+
+## Lumping 
+
+```{r}
+# Lump levels for two features
+rare_encoder <- ames_recipe %>%
+  step_other(Neighborhood, threshold = 0.01, other = "other")
+```
+
+
+# Dimension reduction 
+
+```{r engineering-pca}
+pca_encoder <- ames_recipe %>%
+  step_center(all_numeric()) %>%
+  step_scale(all_numeric()) %>%
+  step_pca(all_numeric(), threshold = .95)
+```
+
+# Proper implementation
+
+First, let's create our
+
+1. train/test split
+2. resampling procedure
+3. model object
+4. hyperparameter grid
+
+These items are nothing new and similar to our approach in the last module.
+
+```{r}
+# create train/test split
+set.seed(123)  # for reproducibility
+split  <- initial_split(ames, prop = 0.7)
+train  <- training(split)
+test   <- testing(split)
+
+# create resampling procedure
+kfold <- vfold_cv(train, v = 10)
+
+# model object
+knn <- nearest_neighbor(neighbors = tune()) %>%
+  set_engine("kknn") %>%
+  set_mode("regression")
+
+# Create grid of hyperparameter values
+hyper_grid <- expand.grid(neighbors = seq(2, 25, by = 1))
+```
+
+Next, we create our model and feature engineering recipe with the 6 steps mentioned above.
+
+```{r}
+# model recipe with feature engineering steps
+model_form <- recipe(Sale_Price ~ ., data = train) %>%
+  # 1. Remove near-zero variance features that are categorical 
+  step_nzv(all_nominal()) %>%
+  # 2. Ordinal encode our quality-based features
+  step_string2factor(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"),
+    levels = lvls
+    ) %>% 
+  step_unknown(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"), 
+    new_level = "None"
+    ) %>%
+  step_relevel(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"), 
+    ref_level = "None"
+    ) %>%
+  step_integer(ends_with("Qual"), ends_with("QC"), ends_with("_Cond")) %>%
+  # 3. Center and scale (i.e., standardize) all numeric features
+  step_center(all_numeric(), -all_outcomes()) %>%
+  step_scale(all_numeric(), -all_outcomes()) %>%
+  # 4. Perform dimension reduction by applying PCA to all numeric features.
+  step_pca(all_numeric(), -all_outcomes(), num_comp = 30) %>%
+  # 5. Collapse categorical levels with small representation
+  step_other(all_nominal(), threshold = 0.01, other = "other") %>%
+  # 6. One-hot encode the remaining categorical features.
+  step_dummy(all_nominal(), one_hot = TRUE)
+```
+
+Now we can run `tune_grid` and supply it all our objects. This is where the feature engineering actually happens as `tune_grid` will apply the feature engineering steps individually within each of the kfold resamples so there is no data leakage.
+
+```{r, fig.height=3, fig.width=6, fig.align='center'}
+# Tune a knn model using grid search
+results <- tune_grid(knn, model_form, resamples = kfold, grid = hyper_grid)
+
+# best model
+show_best(results, metric = "rmse")
+
+# plot results
+results %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  ggplot(aes(neighbors, mean)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "k", y = "RMSE", title = "Cross validated grid search results")
+```
+
+# Exercises
+
+Using the Ames dataset and the same approach shown in the last section:
+
+1. Rather than use a 70% stratified training split, try an 80% unstratified training split. How does your cross-validated results compare?
+
+2. Rather than numerically encode the quality and condition features (i.e. `step_integer(matches("Qual|Cond|QC"))`), one-hot encode these features.  What is the difference in the number of features in your training set?  Apply the same cross-validated KNN model to this new feature set. How does the performance change? How does the training time change?
+
+3. Identify three new feature engineering steps that are provided by [recipes](https://recipes.tidymodels.org/), [scikit-learn](https://scikit-learn.org/stable/modules/preprocessing.html#preprocessing) or some other open source R/Python package:
+   - Why would these feature engineering steps be applicable to the Ames data?
+   - Apply these feature engineering steps along with the same cross-validated KNN model. How do your results change?
+   
+4. Compare the Python and R preprocessing steps in the last section. Can you spot any discrepancies? If so, resolve them so the pipelines are performing the same steps.
+   
+4. Using the [Attrition data set](https://misk-data-science.github.io/misk-homl/docs/01-introduction.nb.html#the_data_sets), assess the characteristics of the target and features.
+   - Which target/feature engineering steps should be applied?
+   - Create a feature engineering pipeline and apply a KNN grid search. What is the performance of your model?

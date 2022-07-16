@@ -1,0 +1,132 @@
+---
+title: 'Module 1: Introduction to Machine Learning'
+output:
+  html_document:
+    df_print: paged
+---
+
+## Prerequisites
+
+```{r}
+# common data wrangling and visualization
+# install.packages("tidyverse")
+# install.packages("vip")
+
+# modeling
+# install.packages("tidymodels")
+```
+
+```{r}
+packageVersion("tidymodels")
+
+library(tidymodels)
+```
+
+## Boston housing
+
+```{r}
+# access data
+boston <- readr::read_csv("../data/boston.csv") 
+
+# initial dimension
+dim(boston)
+
+# features
+dplyr::select(boston, -cmedv)
+
+# response variable
+head(boston$cmedv)
+```
+
+## Pima Indians Diabetes
+
+```{r}
+# access data
+pima <- readr::read_csv("../data/pima.csv") 
+
+# initial dimension
+dim(pima)
+
+# features
+dplyr::select(pima, -diabetes)
+
+# response variable
+head(pima$diabetes)
+```
+
+## Iris flowers
+
+```{r}
+# access data
+iris <- readr::read_csv("../data/iris.csv") 
+
+# initial dimension
+dim(iris)
+
+# features
+dplyr::select(iris, -Species)
+
+# response variable
+head(iris$Species)
+```
+
+## Ames housing
+
+```{r}
+# access data
+ames <- readr::read_csv("../data/ames.csv") 
+
+# initial dimension
+dim(ames)
+
+# features
+dplyr::select(ames, -Sale_Price)
+
+# response variable
+head(ames$Sale_Price)
+```
+
+## Attrition
+
+```{r import-attrition-data}
+# access data
+attrition <- readr::read_csv("../data/attrition.csv") 
+
+# initial dimension
+dim(attrition)
+
+# features
+dplyr::select(attrition, -Attrition)
+
+# response variable
+head(attrition$Attrition)
+```
+
+## Exercises
+
+1. Identify four real-life applications of supervised and unsupervised problems.
+   - Explain what makes these problems supervised versus unsupervised.
+   - For each problem identify the target variable (if applicable) and potential
+     features.
+
+2. Identify and contrast a regression problem with a classification problem.
+   - What is the target variable in each problem and why would being able to
+     accurately predict this target be beneficial to society?
+   - What are potential features and where could you collect this information?
+   - What is determining if the problem is a regression or a classification
+     problem?
+
+3. Identify three open source data sets suitable for machine learning (e.g.,
+   https://bit.ly/35wKu5c).
+   - Explain the type of machine learning models that could be constructed from
+     the data (e.g., supervised versus unsupervised and regression versus
+     classification).
+   - What are the dimensions of the data?
+   - Is there a code book that explains who collected the data, why it was
+     originally collected, and what each variable represents?
+   - If the data set is suitable for supervised learning, which variable(s) could
+     be considered as a useful target? Which variable(s) could be considered as
+     features?
+
+4. Identify examples of misuse of machine learning in society. What was the
+   ethical concern?

@@ -206,6 +206,11 @@ PlantGrowth %>%
 Plant.anova <- anova(Plant.lm)
 
 
+summary(Plant.lm)
+summary(PlantGrowth)
+
+# PlantGrowth.summary()
+# y = f(x)
 
 
 
