@@ -26,7 +26,7 @@ library(tidymodels)
 
 ```{r}
 # access data
-boston <- readr::read_csv("../data/boston.csv") 
+boston <- readr::read_csv("./00-data/ML/boston.csv") 
 
 # initial dimension
 dim(boston)
@@ -42,7 +42,7 @@ head(boston$cmedv)
 
 ```{r}
 # access data
-pima <- readr::read_csv("../data/pima.csv") 
+pima <- readr::read_csv("./00-data/ML/pima.csv") 
 
 # initial dimension
 dim(pima)
@@ -58,7 +58,7 @@ head(pima$diabetes)
 
 ```{r}
 # access data
-iris <- readr::read_csv("../data/iris.csv") 
+iris <- readr::read_csv("./00-data/ML/iris.csv") 
 
 # initial dimension
 dim(iris)
@@ -74,7 +74,7 @@ head(iris$Species)
 
 ```{r}
 # access data
-ames <- readr::read_csv("../data/ames.csv") 
+ames <- readr::read_csv("./00-data/ML/ames.csv") 
 
 # initial dimension
 dim(ames)
@@ -90,7 +90,7 @@ head(ames$Sale_Price)
 
 ```{r import-attrition-data}
 # access data
-attrition <- readr::read_csv("../data/attrition.csv") 
+attrition <- readr::read_csv("./00-data/ML/attrition.csv") 
 
 # initial dimension
 dim(attrition)

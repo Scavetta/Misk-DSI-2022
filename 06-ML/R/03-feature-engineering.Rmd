@@ -1,6 +1,8 @@
 ---
 title: "Feature & Target Engineering"
 output: html_notebook
+editor_options: 
+  chunk_output_type: inline
 ---
 
 # Prerequisites 
@@ -16,7 +18,7 @@ library(tidymodels)
 
 ```{r}
 # Ames housing data
-ames = read_csv("../data/ames.csv")
+ames = read_csv("./00-data/ML/ames.csv")
 
 # create training/test split
 set.seed(123)

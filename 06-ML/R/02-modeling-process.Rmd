@@ -26,10 +26,10 @@ library(tidymodels)
 Data required
 ```{r}
 # Ames housing data
-ames = read_csv("../data/ames.csv")
+ames = read_csv("./00-data/ML/ames.csv")
 
 # Job attrition data
-attrition = read_csv("../data/attrition.csv")
+attrition = read_csv("./00-data/ML/attrition.csv")
 ```
 
 
