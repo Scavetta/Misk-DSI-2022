@@ -1,0 +1,254 @@
+---
+title: "Linear Regression & Cousins"
+output: html_notebook
+---
+
+# Prereqs 
+
+```{r}
+# Helper packages
+library(dplyr)    # for data manipulation
+library(ggplot2)  # for awesome graphics
+
+# Modeling packages
+library(tidymodels)
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("mixOmics")
+library(plsmod)
+
+# Model interpretability packages
+library(vip)      # variable importance
+```
+
+```{r}
+# Ames housing data
+ames <- AmesHousing::make_ames()
+
+# create training/test split
+set.seed(123)
+split  <- initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- training(split)
+ames_test   <- testing(split)
+```
+
+# Simple linear regression 
+
+```{r}
+# create linear regression model object
+lm_mod <- linear_reg() %>%  set_engine("lm")
+
+# fit linear model with only Gr_Liv_Area feature
+lm_fit <- 
+  lm_mod %>% 
+  fit(Sale_Price ~ Gr_Liv_Area, data = ames_train)
+```
+
+## Coefficients
+
+```{r}
+lm_fit
+``` 
+
+# Multiple linear regression 
+
+```{r}
+# create linear regression model object
+lm_mod <- linear_reg() %>%  set_engine("lm")
+
+# fit linear model with only Gr_Liv_Area and Year_Built feature
+lm_fit <- 
+  lm_mod %>% 
+  fit(Sale_Price ~ Gr_Liv_Area + Year_Built, data = ames_train)
+```
+
+## Coefficients
+
+```{r}
+lm_fit
+```
+
+## Interactions
+
+```{r}
+# create linear regression model object
+lm_mod <- linear_reg() %>%  set_engine("lm")
+
+# fit linear model with Gr_Liv_Area and Year_Built main effects and
+# also include an interaction effect (Gr_Liv_Area:Year_Built)
+lm_fit <- 
+  lm_mod %>% 
+  fit(
+    Sale_Price ~ Gr_Liv_Area + Year_Built + Gr_Liv_Area:Year_Built, 
+    data = ames_train
+    )
+
+lm_fit
+```
+
+## Many features
+
+```{r}
+# create linear regression model object
+lm_mod <- linear_reg() %>%  set_engine("lm")
+
+# fit linear model with all features
+lm_fit <- 
+  lm_mod %>% 
+  fit(Sale_Price ~ ., data = ames_train)
+
+results_df <- tidy(lm_fit)
+```
+
+
+
+# Assessing model accuracy 
+
+```{r}
+ # create linear regression model object
+lm_mod <- linear_reg() %>%  set_engine("lm")
+
+# create three model recipes
+lm1 <- recipe(Sale_Price ~ Gr_Liv_Area, data = ames_train) %>% 
+ step_dummy(all_nominal_predictors())
+
+lm2 <- recipe(Sale_Price ~ Gr_Liv_Area + Year_Built, data = ames_train) %>% 
+ step_dummy(all_nominal_predictors())
+
+lm3 <- recipe(Sale_Price ~ ., data = ames_train) %>% 
+ step_dummy(all_nominal_predictors())
+
+# combine model objects and recipes into a workflow object
+preproc <- list(lm1, lm2, lm3)
+models <- list(lm_mod)
+
+model_set <- workflow_set(preproc, models, cross = TRUE)
+model_set
+```
+
+```{r, message=FALSE, warning=FALSE}
+# create our k-fold CV object
+kfold <- vfold_cv(ames_train, v = 10)
+
+# iterate over our workflow object to execute and score the cross 
+# validation procedure
+lm_models <- model_set %>%
+  workflow_map("fit_resamples",
+               seed = 8451,
+               resamples = kfold)
+
+lm_models
+```
+
+```{r}
+collect_metrics(lm_models) %>% 
+  filter(.metric == "rmse")
+```
+
+# Principal Component Regression
+
+```{r}
+# create linear model object
+lm_mod <- linear_reg() %>%  set_engine("lm")
+
+# create k-fold cross validation object
+folds <- vfold_cv(ames_train, v = 5)
+
+# create our preprocessing steps which includes performing PCA 
+# with 10 components
+model_form <- recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>%
+  step_pca(all_numeric(), -all_outcomes(), num_comp = 10) %>%
+  step_dummy(all_nominal_predictors())
+
+# create a workflow object that combines model with recipe
+pca_wf <- workflow() %>%
+  add_model(lm_mod) %>%
+  add_recipe(model_form)
+
+# train and fit our model
+set.seed(123)
+pca_fit_rs <- pca_wf %>% 
+  fit_resamples(folds)
+
+# get results
+collect_metrics(pca_fit_rs) %>%
+  filter(.metric == "rmse")
+```
+
+## Tuning
+
+```{r}
+# create linear model object
+lm_mod <- linear_reg() %>%  set_engine("lm")
+
+# create k-fold cross validation object
+folds <- vfold_cv(ames_train, v = 5)
+
+# create our model recipe with a tuning option for number of components
+model_form <- recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>%
+  step_pca(all_numeric(), -all_outcomes(), num_comp = tune()) %>%
+  step_dummy(all_nominal_predictors())
+
+# create a hyper parameter tuning grid for number of components
+hyper_grid <- expand.grid(num_comp = seq(1, 26, by = 2))
+
+# train our model across the hyper parameter grid
+set.seed(8451)
+results <- tune_grid(lm_mod, model_form, resamples = folds, grid = hyper_grid)
+
+# get best results
+show_best(results, metric = "rmse")
+```
+
+
+# Partial Least Squares Regression
+
+```{r}
+# create PLS model object with a tuning option for number of components
+pls_mod <- plsmod::pls(num_comp = tune()) %>%  
+  set_engine("mixOmics") %>%
+  set_mode("regression")
+
+# create k-fold cross validation object
+folds <- vfold_cv(ames_train, v = 5)
+
+# create our model recipe
+model_form <- recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>%
+  step_dummy(all_nominal_predictors())
+
+# create a hyper parameter tuning grid for number of components
+hyper_grid <- expand.grid(num_comp = seq(2, 26, by = 2))
+
+# train our model across the hyper parameter grid
+set.seed(123)
+results <- tune_grid(pls_mod, model_form, resamples = folds, grid = hyper_grid)
+
+# get best results
+show_best(results, metric = "rmse")
+```
+
+
+# Exercises
+
+Using the Boston housing data set where the response feature is the median value of homes within a census tract (`cmedv`):
+
+1. Pick a single feature and apply a simple linear regression model.
+   - Interpret the feature's coefficient
+   - What is the model's performance? How does it compare to the KNN in the last module?
+2. Pick another feature to add to the model.
+   - Before applying the model why do you think this feature will help?
+   - Apply a linear regression model with the two features and compare to the simple linear model.
+   - Interpret the coefficients.
+3. Now apply a model that includes all the predictors.
+   - How does this model compare to the previous two?
+4. Can you identify any model concerns?
+5. Apply a principal component regression model.
+   - Perform a grid search over several components.
+   - Identify and explain the performance of the optimal model.
+6. Now apply a partial least square model.
+   - Perform a grid search over several components.
+   - Identify and explain the performance of the optimal model.
