@@ -1,0 +1,63 @@
+faa,name,lat,lon,alt,tz,dst,tzone
+ATL,Hartsfield Jackson Atlanta Intl,33.636719,-84.428067,1026,-5,A,America/New_York
+AUS,Austin Bergstrom Intl,30.194528,-97.669889,542,-6,A,America/Chicago
+BGR,Bangor Intl,44.807444,-68.828139,192,-5,A,America/New_York
+BHM,Birmingham Intl,33.562942,-86.75355,644,-6,A,America/Chicago
+BNA,Nashville Intl,36.124472,-86.678194,599,-6,A,America/Chicago
+BOS,General Edward Lawrence Logan Intl,42.364347,-71.005181,19,-5,A,America/New_York
+BTV,Burlington Intl,44.471861,-73.153278,335,-5,A,America/New_York
+BUF,Buffalo Niagara Intl,42.940525,-78.732167,724,-5,A,America/New_York
+CHS,Charleston Afb Intl,32.898647,-80.040528,45,-5,A,America/New_York
+CLE,Cleveland Hopkins Intl,41.411689,-81.849794,791,-5,A,America/New_York
+CLT,Charlotte Douglas Intl,35.214,-80.943139,748,-5,A,America/New_York
+CMH,Port Columbus Intl,39.997972,-82.891889,815,-5,A,America/New_York
+CVG,Cincinnati Northern Kentucky Intl,39.048836,-84.667822,896,-5,A,America/New_York
+DCA,Ronald Reagan Washington Natl,38.852083,-77.037722,15,-5,A,America/New_York
+DEN,Denver Intl,39.861656,-104.673178,5431,-7,A,America/Denver
+DFW,Dallas Fort Worth Intl,32.896828,-97.037997,607,-6,A,America/Chicago
+DSM,Des Moines Intl,41.533972,-93.663083,958,-6,A,America/Chicago
+DTW,Detroit Metro Wayne Co,42.212444,-83.353389,645,-5,A,America/New_York
+EGE,Eagle Co Rgnl,39.642556,-106.917694,6540,-7,A,America/Denver
+EWR,Newark Liberty Intl,40.6925,-74.168667,18,-5,A,America/New_York
+FLL,Fort Lauderdale Hollywood Intl,26.072583,-80.15275,9,-5,A,America/New_York
+GSO,Piedmont Triad,36.09775,-79.937306,925,-5,A,America/New_York
+HOU,William P Hobby,29.645419,-95.278889,46,-6,A,America/Chicago
+IAH,George Bush Intercontinental,29.984433,-95.341442,97,-6,A,America/Chicago
+ILM,Wilmington Intl,34.270615,-77.902569,32,-5,A,America/New_York
+JAX,Jacksonville Intl,30.494056,-81.687861,30,-5,A,America/New_York
+JFK,John F Kennedy Intl,40.639751,-73.778925,13,-5,A,America/New_York
+LAS,Mc Carran Intl,36.080056,-115.15225,2141,-8,A,America/Los_Angeles
+LAX,Los Angeles Intl,33.942536,-118.408075,126,-8,A,America/Los_Angeles
+LGA,La Guardia,40.777245,-73.872608,22,-5,A,America/New_York
+MCI,Kansas City Intl,39.297606,-94.713905,1026,-6,A,America/Chicago
+MCO,Orlando Intl,28.429394,-81.308994,96,-5,A,America/New_York
+MDW,Chicago Midway Intl,41.785972,-87.752417,620,-6,A,America/Chicago
+MEM,Memphis Intl,35.042417,-89.976667,341,-6,A,America/Chicago
+MIA,Miami Intl,25.79325,-80.290556,8,-5,A,America/New_York
+MKE,General Mitchell Intl,42.947222,-87.896583,723,-6,A,America/Chicago
+MSN,Dane Co Rgnl Truax Fld,43.139858,-89.337514,887,-6,A,America/Chicago
+MSP,Minneapolis St Paul Intl,44.881956,-93.221767,841,-6,A,America/Chicago
+MSY,Louis Armstrong New Orleans Intl,29.993389,-90.258028,4,-6,A,America/Chicago
+ORD,Chicago Ohare Intl,41.978603,-87.904842,668,-6,A,America/Chicago
+ORF,Norfolk Intl,36.894611,-76.201222,26,-5,A,America/New_York
+PBI,Palm Beach Intl,26.683161,-80.095589,19,-5,A,America/New_York
+PDX,Portland Intl,45.588722,-122.5975,30,-8,A,America/Los_Angeles
+PHX,Phoenix Sky Harbor Intl,33.434278,-112.011583,1135,-7,N,America/Phoenix
+PIT,Pittsburgh Intl,40.491467,-80.232872,1204,-5,A,America/New_York
+PWM,Portland Intl Jetport,43.646161,-70.309281,77,-5,A,America/New_York
+RDU,Raleigh Durham Intl,35.877639,-78.787472,435,-5,A,America/New_York
+RIC,Richmond Intl,37.505167,-77.319667,167,-5,A,America/New_York
+ROC,Greater Rochester Intl,43.118866,-77.672389,559,-5,A,America/New_York
+RSW,Southwest Florida Intl,26.536167,-81.755167,30,-5,A,America/New_York
+SAN,San Diego Intl,32.733556,-117.189667,17,-8,A,America/Los_Angeles
+SAT,San Antonio Intl,29.533694,-98.469778,809,-6,A,America/Chicago
+SAV,Savannah Hilton Head Intl,32.127583,-81.202139,51,-5,A,America/New_York
+SBN,South Bend Rgnl,41.708661,-86.31725,799,-5,A,America/New_York
+SEA,Seattle Tacoma Intl,47.449,-122.309306,433,-8,A,America/Los_Angeles
+SFO,San Francisco Intl,37.618972,-122.374889,13,-8,A,America/Los_Angeles
+SNA,John Wayne Arpt Orange Co,33.675667,-117.868222,56,-8,A,America/Los_Angeles
+SRQ,Sarasota Bradenton Intl,27.395444,-82.554389,30,-5,A,America/New_York
+STL,Lambert St Louis Intl,38.748697,-90.370028,618,-6,A,America/Chicago
+SYR,Syracuse Hancock Intl,43.111187,-76.106311,421,-5,A,America/New_York
+TPA,Tampa Intl,27.975472,-82.53325,26,-5,A,America/New_York
+TVC,Cherry Capital Airport,44.741445,-85.582235,624,-5,A,America/New_York

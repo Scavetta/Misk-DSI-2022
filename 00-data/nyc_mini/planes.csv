@@ -1,0 +1,8 @@
+tailnum,year,type,manufacturer,model,engines,seats,speed,engine
+N259WN,2006,Fixed wing multi engine,BOEING,737-7H4,2,140,NA,Turbo-fan
+N370NB,2003,Fixed wing multi engine,AIRBUS,A319-114,2,145,NA,Turbo-fan
+N398CA,2003,Fixed wing multi engine,BOMBARDIER INC,CL-600-2C10,2,80,NA,Turbo-fan
+N438UA,1997,Fixed wing multi engine,AIRBUS INDUSTRIE,A320-232,2,200,NA,Turbo-fan
+N652AW,1999,Fixed wing multi engine,AIRBUS INDUSTRIE,A320-232,2,200,NA,Turbo-fan
+N703UW,1998,Fixed wing multi engine,AIRBUS INDUSTRIE,A319-112,2,179,NA,Turbo-fan
+N913EV,2002,Fixed wing multi engine,BOMBARDIER INC,CL-600-2B19,2,55,NA,Turbo-fan
