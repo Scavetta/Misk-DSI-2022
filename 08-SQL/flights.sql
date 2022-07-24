@@ -78,3 +78,12 @@ SELECT tailnum, flight, COUNT(flight) n
 FROM flights
 GROUP BY tailnum, flight
 HAVING (tailnum IN ('N652AW', 'N370NB') AND dep_delay > 0);
+
+
+
+
+SELECT *
+FROM flights
+INNER JOIN airports;
+
+

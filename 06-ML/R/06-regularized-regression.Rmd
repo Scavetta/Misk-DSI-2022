@@ -1,0 +1,230 @@
+---
+title: "Regularized Regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Prerequisites
+
+```{r}
+# Helper packages
+library(tidyverse) # general data munging & visualization
+
+# Modeling packages
+library(tidymodels)
+
+# Model interpretability packages
+library(vip)      # for variable importance
+```
+
+```{r 06-ames-train}
+# Stratified sampling with the rsample package
+ames <- AmesHousing::make_ames()
+set.seed(123)  # for reproducibility
+split  <- initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- training(split)
+ames_test   <- testing(split)
+```
+
+
+# Implementation
+
+## Ridge
+
+```{r}
+# Step 1: create ridge model object
+ridge_mod <- linear_reg(penalty = 1, mixture = 0) %>%
+  set_engine("glmnet")
+
+# Step 2: create model & preprocessing recipe
+model_recipe <- recipe(
+    Sale_Price ~ Gr_Liv_Area + Year_Built + Garage_Cars + Garage_Area, 
+    data = ames_train
+  ) %>%
+  step_normalize(all_predictors())
+  
+# Step 3: fit model workflow
+ridge_fit <- workflow() %>%
+  add_recipe(model_recipe) %>%
+  add_model(ridge_mod) %>%
+  fit(data = ames_train)
+
+# Step 4: extract and tidy results
+ridge_fit %>%
+  pull_workflow_fit() %>%
+  tidy()
+
+# 1 (Intercept)  180923.       1
+# 2 Gr_Liv_Area   37441.       1
+# 3 Year_Built    22587.       1
+# 4 Garage_Cars   10825.       1
+# 5 Garage_Area   11495.       1
+
+```
+
+## Lasso
+
+```{r}
+# Step 1: create ridge model object
+lasso_mod <- linear_reg(penalty = 1, mixture = 1) %>%
+  set_engine("glmnet")
+  
+# Step 3: fit model workflow
+lasso_fit <- workflow() %>%
+  add_recipe(model_recipe) %>%
+  add_model(lasso_mod) %>%
+  fit(data = ames_train)
+
+# Step 4: extract and tidy results
+lasso_fit %>%
+  pull_workflow_fit() %>%
+  tidy()
+
+# 1 (Intercept)  180923.       1
+# 2 Gr_Liv_Area   40301.       1
+# 3 Year_Built    24131.       1
+# 4 Garage_Cars    9183.       1
+# 5 Garage_Area   11269.       1
+```
+
+## Elastic net
+
+```{r}
+# Step 1: create ridge model object
+en_mod <- linear_reg(penalty = 1, mixture = 0.5) %>%
+  set_engine("glmnet")
+  
+# Step 3: fit model workflow
+en_fit <- workflow() %>%
+  add_recipe(model_recipe) %>%
+  add_model(en_mod) %>%
+  fit(data = ames_train)
+
+# Step 4: extract and tidy results
+en_fit %>%
+  pull_workflow_fit() %>%
+  tidy()
+
+# 1 (Intercept)  180923.       1
+# 2 Gr_Liv_Area   40200.       1
+# 3 Year_Built    24094.       1
+# 4 Garage_Cars    9267.       1
+# 5 Garage_Area   11309.       1
+```
+
+
+# Tuning
+
+## Tuning regularization strength
+
+```{r}
+# create linear model object
+ridge_mod <- linear_reg(penalty = tune(), mixture = 0) %>%
+  set_engine("glmnet")
+
+# create k-fold cross validation object
+folds <- vfold_cv(ames_train, v = 5)
+
+# create our model recipe with a tuning option for number of components
+model_recipe <- recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+# create a hyper parameter tuning grid for penalty
+hyper_grid <- grid_regular(penalty(range = c(-10, 5)), levels = 50)
+
+# train our model across the hyper parameter grid
+set.seed(123)
+results <- tune_grid(ridge_mod, model_recipe, resamples = folds, grid = hyper_grid)
+
+# get best results
+show_best(results, metric = "rmse")
+
+# 30850
+
+```
+
+
+## Tuning regularization type & strength
+
+```{r}
+# create linear model object
+mod <- linear_reg(penalty = tune(), mixture = tune()) %>%
+  set_engine("glmnet")
+
+# create k-fold cross validation object
+folds <- vfold_cv(ames_train, v = 5)
+
+# create our model recipe with a tuning option for number of components
+model_recipe <- recipe(Sale_Price ~ ., data = ames_train) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+# create a hyper parameter tuning grid for penalty
+hyper_grid <- grid_regular(
+  penalty(range = c(-10, 5)), 
+  mixture(), 
+  levels = c(mixture = 5, penalty = 50)
+  )
+
+# train our model across the hyper parameter grid
+set.seed(123)
+results <- tune_grid(mod, model_recipe, resamples = folds, grid = hyper_grid)
+
+# get best results
+show_best(results)
+```
+
+
+# Feature importance
+
+```{r}
+# identify best model
+lowest_rmse <- results %>%
+  select_best("rmse")
+
+# extract best model workflow
+final_model <- finalize_workflow(
+  workflow() %>% add_recipe(model_recipe) %>% add_model(ridge_mod), 
+  lowest_rmse)
+
+# extract feature importance for top 25 most influential features
+top_25_features <- final_model %>%
+  fit(ames_train) %>%
+  pull_workflow_fit() %>% 
+  vi(lambda = lowest_rmse$penalty) %>%
+  mutate(
+    Importance = abs(Importance),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  top_n(25, wt = Importance)
+```
+
+```{r}
+ggplot(top_25_features, aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(y = NULL)
+```
+
+
+# Exercises
+
+Using the boston housing dataset:
+
+1. Apply a ridge model with glmnet with `medv` being the response variable.
+   - What is the minimum MSE?
+   - What is the minimum MSE within 1 standard error?
+   - What are the lambda values for these MSEs?
+2. Apply a lasso model with glmnet.
+   - What is the minimum MSE?
+   - What is the minimum MSE within 1 standard error?
+   - What are the lambda values for these MSEs?
+3. Perform a grid search across alpha parameter values ranging between 0–1.
+   - What is the optimal alpha and lambda values?
+   - What is the MSE and RMSE for this optimal model?
+   - How does it compare to your previous models?
+4. Plot the top 10 most influential features. Do these features have positive or negative impacts on your response variable?

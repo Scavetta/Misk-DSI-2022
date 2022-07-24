@@ -1,0 +1,160 @@
+---
+title: "K-nearest Neighbor"
+output: html_notebook
+---
+
+# Prerequisites
+
+```{r}
+# Helper packages
+library(tidyverse)   # for data wrangling & plotting
+
+# Modeling packages
+library(tidymodels) 
+
+# Model interpretability packages
+library(vip)         # for variable importance
+library(pdp)         # for variable relationships
+```
+
+```{r}
+pima <- read_csv("../data/pima.csv") %>% 
+  mutate(diabetes = factor(diabetes, levels = c("pos", "neg")))
+
+set.seed(123)
+split  <- rsample::initial_split(pima, prop = 0.7, strata = "diabetes")
+train  <- rsample::training(split)
+test   <- rsample::testing(split)
+```
+
+# Fitting a KNN model
+
+```{r}
+# model recipe
+model_form <- recipe(diabetes ~ ., data = train) %>%
+  step_normalize(all_predictors())
+
+# model object
+knn <- nearest_neighbor(neighbors = 5) %>%
+  set_engine("kknn") %>%
+  set_mode("classification")
+
+# create resampling procedure
+set.seed(13)
+kfold <- vfold_cv(train, v = 5, strata = "diabetes")
+
+# train model
+results <- fit_resamples(knn, model_form, kfold)
+
+# see RMSE for all folds
+collect_metrics(results, summarize = FALSE) %>% filter(.metric == "roc_auc")
+```
+
+# Tuning
+
+```{r}
+# model object
+knn <- nearest_neighbor(neighbors = tune()) %>%
+  set_engine("kknn") %>%
+  set_mode("classification")
+
+# Create grid of hyperparameter values
+hyper_grid <- expand.grid(neighbors = seq(1, 100, by = 4))
+
+# Tune a knn model using grid search
+results <- tune_grid(knn, model_form, resamples = kfold, grid = hyper_grid)
+```
+
+```{r}
+# plot results
+autoplot(results)
+```
+
+```{r}
+# best model
+show_best(results, metric = "roc_auc")
+```
+```{r}
+# optimal k
+optimal_k <- show_best(results, metric = "roc_auc") %>%
+  select(neighbors) %>%
+  slice(1) %>%
+  pluck(1)
+```
+
+# Model performance
+
+```{r}
+best_knn <- nearest_neighbor(neighbors = optimal_k) %>%
+  set_engine("kknn") %>%
+  set_mode("classification")
+
+best_fit <- workflow() %>%
+  add_model(best_knn) %>%
+  add_recipe(model_form) %>%
+  fit(data = train)
+
+pred <- best_fit %>% 
+  predict(train, type = "prob") %>%
+  mutate(diabetes = train$diabetes)
+
+pred %>%
+  roc_curve(truth = diabetes, .pred_pos) %>%
+  autoplot()
+```
+
+```{r}
+# confusion matrix
+cf <- best_fit %>% 
+  predict(train) %>%
+  cbind(train) %>%
+  conf_mat(diabetes, .pred_class)
+```
+
+```{r}
+summary(cf)
+```
+
+# Feature interpretation
+
+```{r}
+knn_mod <- train.kknn(diabetes ~ ., train, kmax = 69, ks = 69)
+
+pred_fun <- function(object, newdata) {
+  as.character(predict(object, newdata))
+}
+
+vip(knn_mod, method = "permute", train = train, target = "diabetes", 
+    metric = "auc", pred_wrapper = pred_fun, reference_class = "pos", 
+    type = "ratio", nsim = 30)
+```
+
+```{r}
+# prediction function
+pdp_pred_fun <- function(object, newdata) {
+  mean(predict(object, newdata, type = "prob")[, "pos"])
+}
+
+# use the pdp package to extract partial dependence predictions
+# and then plot
+knn_mod %>%
+  pdp::partial(
+   pred.var = "glucose", 
+   pred.fun = pdp_pred_fun,
+   grid.resolution = 10, 
+   train = train
+  ) %>%
+  ggplot(aes(glucose, yhat)) +
+  geom_line() +
+  ylab("Predicted probability of diabetes")
+```
+
+# Exercises
+
+Using the `hitters` dataset where the `Salary` variable is the response variable:
+
+1. Apply a KNN model with all features. Use a grid search to assess values of _k_ ranging from 1-99 that seeks to optimize the "RMSE" metric.
+2. Plot the grid search performance.
+3. What value for _K_ optimizes model performance? What does this tell you about your data?
+4. Which 10 features are considered most influential? 
+5. Plot the relationship between the most influential feature and the predicted salary values.

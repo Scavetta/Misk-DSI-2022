@@ -1,0 +1,198 @@
+---
+title: "Logistic Regression"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Prerequisites
+
+For this section we'll use the following packages:
+
+```{r}
+# Helper packages
+library(tidyverse) # for data wrangling & plotting
+
+# Modeling packages
+library(tidymodels)
+
+# Model interpretability packages
+library(vip)      # variable importance
+```
+
+```{r logit-data-import}
+churn <- read_csv("../data/attrition.csv")
+
+# recode response variable as a factor
+churn <- mutate(churn, Attrition = as.factor(Attrition))
+
+# Create training (70%) and test (30%) sets for the 
+# rsample::attrition data.
+set.seed(123)  # for reproducibility
+churn_split <- initial_split(churn, prop = .7, strata = "Attrition")
+churn_train <- training(churn_split)
+churn_test  <- testing(churn_split)
+```
+
+# Simple logistic regression
+
+```{r}
+lr_mod <- logistic_reg() %>% set_engine("glm")
+
+# model 1
+lr_fit1 <- lr_mod %>% 
+  fit(Attrition ~ MonthlyIncome, data = churn_train)
+
+# model 2
+lr_fit2 <- lr_mod %>% 
+  fit(Attrition ~ OverTime, data = churn_train)
+```
+
+
+## Interpretation
+
+```{r}
+lr_fit1 %>% predict(churn_train, type = "prob")
+```
+
+```{r}
+lr_fit1 %>% 
+ predict(churn_train, type = "prob") %>%
+ mutate(MonthlyIncome = churn_train$MonthlyIncome) %>%
+ ggplot(aes(MonthlyIncome, .pred_Yes)) +
+ geom_point(alpha = .2) +
+ scale_y_continuous("Probability of Attrition", limits = c(0, 1))
+```
+
+```{r}
+lr_fit2 %>% 
+ predict(churn_train, type = "prob") %>%
+ mutate(OverTime = churn_train$OverTime) %>%
+ ggplot(aes(OverTime, .pred_Yes, color = OverTime)) +
+ geom_boxplot(show.legend = FALSE) +
+ geom_rug(sides = "b", position = "jitter", alpha = 0.2, show.legend = FALSE) +
+  scale_y_continuous("Probability of Attrition", limits = c(0, 1))
+```
+
+
+# Multiple logistic regression 
+
+```{r}
+lr_mod <- logistic_reg() %>% set_engine("glm")
+
+# model 3
+lr_fit3 <- lr_mod %>% 
+  fit(Attrition ~ MonthlyIncome + OverTime, data = churn_train)
+```
+
+```{r}
+lr_fit3 %>% 
+  predict(churn_train, type = "prob") %>%
+  mutate(
+    MonthlyIncome = churn_train$MonthlyIncome,
+    OverTime = churn_train$OverTime
+    ) %>%
+  ggplot(aes(MonthlyIncome, .pred_Yes, color = OverTime)) +
+  geom_point(alpha = 0.5, size = 0.8) +
+  scale_y_continuous("Probability of Attrition", limits = c(0, 1))
+```
+
+
+# Assessing model accuracy
+
+```{r}
+lr_fit2 %>% 
+  predict(churn_train, type = "prob") %>%
+  mutate(truth = churn_train$Attrition) %>%
+  roc_auc(truth, .pred_No)
+```
+
+## Cross-validation performance
+
+```{r}
+# create resampling procedure
+kfold <- vfold_cv(churn_train, v = 5)
+
+# train model via cross validation
+results <- fit_resamples(lr_mod, Attrition ~ MonthlyIncome, kfold)
+
+# see AUC for all folds
+collect_metrics(results, summarize = FALSE) %>% filter(.metric == "roc_auc")
+
+# average AUC
+collect_metrics(results, summarize = TRUE) %>% filter(.metric == "roc_auc")
+```
+
+## Model comparison performance 
+
+```{r}
+# create linear regression model object
+lr_mod <- logistic_reg() %>% set_engine("glm")
+
+# create three model recipes
+lr1 <- recipe(Attrition ~ MonthlyIncome, data = churn_train)
+
+lr2 <- recipe(Attrition ~ OverTime, data = churn_train) %>% 
+ step_dummy(all_nominal_predictors())
+
+lr3 <- recipe(Attrition ~ MonthlyIncome + OverTime, data = churn_train) %>% 
+ step_dummy(all_nominal_predictors())
+
+# combine model objects and recipes into a workflow object
+preproc <- list(lr1, lr2, lr3)
+models <- list(lr_mod)
+
+# create our model workflow set
+model_set <- workflow_set(preproc, models, cross = TRUE)
+
+# create our k-fold CV object
+kfold <- vfold_cv(churn_train, v = 5)
+
+# iterate over our workflow object to execute and score the cross 
+# validation procedure
+lr_models <- model_set %>%
+  workflow_map("fit_resamples",
+               seed = 8451,
+               resamples = kfold)
+
+# extract AUC
+collect_metrics(lr_models) %>% 
+  filter(.metric == "roc_auc")
+```
+
+## Performance visualization
+
+```{r}
+pred <- lr_fit3 %>% 
+  predict(churn_train, type = "prob") %>%
+  mutate(
+    MonthlyIncome = churn_train$MonthlyIncome,
+    OverTime = churn_train$OverTime,
+    Attrition = churn_train$Attrition
+    )
+
+pred %>%
+  roc_curve(truth = Attrition, .pred_No) %>%
+  autoplot()
+```
+
+# Exercises
+
+Using the spam data set from the kernlab package:
+
+1. Pick a single feature and apply simple logistic regression model.
+   - Interpret the feature's coefficient
+   - What is the model's performance?
+2. Pick another feature to add to the model.
+   - Before applying the module why do you think this feature will help?
+   - Apply a logistic regression model with the two features and compare to the simple linear model.
+   - Interpret the coefficients.
+3. Now apply a model that includes all the predictors.
+   - How does this model compare to the previous two?
+4. Plot an ROC curve comparing the performance of all three models
+5. Compute and interpret the following performance metrics:
+   - No information rate
+   - accuracy rate
+   - sensitivity
+   - specificity
+   
