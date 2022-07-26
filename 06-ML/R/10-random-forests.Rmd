@@ -1,0 +1,199 @@
+---
+title: "Random Forests"
+output: html_notebook
+---
+
+# Prerequisites 
+
+```{r}
+# Helper packages
+library(tidyverse)   # for data wrangling & plotting
+
+# Modeling packages
+library(tidymodels) 
+
+# Model interpretability packages
+library(vip)         # for variable importance
+library(pdp)         # for variable relationships
+```
+
+```{r ames-train}
+# Stratified sampling with the rsample package
+set.seed(123)
+ames <- AmesHousing::make_ames()
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+# Out-of-the-box performance
+
+```{r}
+# create model recipe with all features
+model_recipe <- recipe(
+    Sale_Price ~ ., 
+    data = ames_train
+  )
+
+# create bagged CART model object and
+# start with 5 bagged trees
+rf_mod <- rand_forest(mode = "regression") %>%
+  set_engine("ranger")
+
+# create resampling procedure
+set.seed(13)
+kfold <- vfold_cv(ames_train, v = 5)
+
+# train model
+results <- fit_resamples(rf_mod, model_recipe, kfold)
+
+# model results
+collect_metrics(results)
+```
+
+# Tuning strategies
+
+## Cartesian grid search
+
+```{r}
+# create model recipe with all features
+model_recipe <- recipe(
+    Sale_Price ~ ., 
+    data = ames_train
+  )
+
+# create random forest model object with tuning option
+rf_mod <- rand_forest(
+  mode = "regression", 
+  trees = 1000,
+  mtry = tune(),
+  min_n = tune()
+  ) %>%
+  set_engine(
+    "ranger",
+    replace = tune(),
+    sample.fraction = tune(),
+    respect.unordered.factors = 'order',
+    seed = 123
+    )
+
+# create the hyperparameter grid
+hyper_grid <- expand.grid(
+  mtry = floor(n_features * c(.05, .15, .25, .333, .4)),
+  min_n = c(1, 3, 5, 10),
+  replace = c(TRUE, FALSE),
+  sample.fraction = c(.5, .63, .8)
+  )
+
+# train our model across the hyper parameter grid
+set.seed(123)
+results <- tune_grid(rf_mod, model_recipe, resamples = kfold, grid = hyper_grid)
+
+
+# model results
+show_best(results, metric = "rmse")
+```
+
+## Random grid search
+
+```{r}
+# take a random subset of our hyperparameter grid
+set.seed(123)
+sampled_ids <- sample(1:nrow(hyper_grid), floor(nrow(hyper_grid)*.3))
+sampled_grid <- hyper_grid[sampled_ids, ]
+
+# train our model across the hyper parameter grid
+set.seed(123)
+results <- tune_grid(rf_mod, model_recipe, resamples = kfold, grid = sampled_grid)
+
+# model results
+show_best(results, metric = "rmse")
+```
+
+## Random grid search with early stopping
+
+```{r}
+# create empty vector to hold RMSE results
+results <- c()
+
+for (row in 1:nrow(sampled_grid)) {
+  # train model with sampled grid parameters
+  rf_mod <- rand_forest(
+  mode = "regression", 
+  trees = 1000,
+  mtry = sampled_grid[row, "mtry"],
+  min_n = sampled_grid[row, "min_n"]
+  ) %>%
+  set_engine(
+    "ranger",
+    replace = sampled_grid[row, "replace"],
+    sample.fraction = sampled_grid[row, "sample.fraction"],
+    respect.unordered.factors = 'order',
+    seed = 123
+    )
+  
+  # train model
+  fit_results <- fit_resamples(rf_mod, model_recipe, kfold)
+
+  # get RMSE and add to results vector
+  rmse <- collect_metrics(fit_results) %>% filter(.metric == "rmse") %>% pluck("mean")
+  results <- c(results, rmse)
+  
+  # print results along the way
+  cat("Model", row, "--> RMSE ==", rmse, "\n")
+  
+  # Test if the current rmse improves upon the past three 5 scores
+  # If not then stop the process
+  threshold <- min(results) * 0.9
+  if ((row >= 5) && (rmse > threshold)) {
+    break
+  }
+}
+```
+
+And we can identify the best model's hyperparameter settings with:
+
+```{r}
+sampled_grid[which.min(results), ]
+```
+
+# Feature interpretation
+
+```{r feature-importance}
+# re-run model with impurity-based variable importance
+rf_impurity <- ranger(
+  formula = Sale_Price ~ ., 
+  data = ames_train, 
+  num.trees = 2000,
+  mtry = 26,
+  min.node.size = 1,
+  sample.fraction = .5,
+  replace = FALSE,
+  importance = "impurity",
+  respect.unordered.factors = "order",
+  verbose = FALSE,
+  seed  = 123
+)
+
+# re-run model with permutation-based variable importance
+rf_permutation <- ranger(
+  formula = Sale_Price ~ ., 
+  data = ames_train, 
+  num.trees = 2000,
+  mtry = 26,
+  min.node.size = 1,
+  sample.fraction = .5,
+  replace = FALSE,
+  importance = "permutation",
+  respect.unordered.factors = "order",
+  verbose = FALSE,
+  seed  = 123
+)
+```
+
+```{r feature-importance-plot, fig.cap="Top 25 most important variables based on impurity (left) and permutation (right).", fig.height=4.5, fig.width=10}
+p1 <- vip::vip(rf_impurity, num_features = 25, bar = FALSE)
+p2 <- vip::vip(rf_permutation, num_features = 25, bar = FALSE)
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```

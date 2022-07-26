@@ -1,0 +1,165 @@
+---
+title: "Decision Trees"
+output: html_notebook
+---
+
+# Prerequisites
+
+```{r}
+# Helper packages
+library(tidyverse)   # for data wrangling & plotting
+
+# Modeling packages
+library(tidymodels) 
+
+# Model interpretability packages
+library(vip)         # for variable importance
+library(pdp)         # for variable relationships
+```
+
+```{r ames-train}
+# Stratified sampling with the rsample package
+set.seed(123)
+ames <- AmesHousing::make_ames()
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+# Basic implementation
+
+## Simple model
+
+```{r}
+# Step 1: create ridge model object
+dt_mod <- decision_tree(mode = "regression") %>% set_engine("rpart")
+
+# Step 2: create model recipe
+model_recipe <- recipe(
+    Sale_Price ~ Gr_Liv_Area + Year_Built, 
+    data = ames_train
+  )
+  
+# Step 3: fit model workflow
+dt_fit <- workflow() %>%
+  add_recipe(model_recipe) %>%
+  add_model(dt_mod) %>%
+  fit(data = ames_train)
+
+# Step 4: results
+dt_fit
+```
+
+```{r}
+rpart.plot(dt_fit$fit$fit$fit)
+```
+
+```{r}
+# create resampling procedure
+set.seed(13)
+kfold <- vfold_cv(ames_train, v = 5)
+
+# train model
+results <- fit_resamples(dt_mod, model_recipe, kfold)
+
+# model results
+collect_metrics(results)
+```
+
+## Full model
+
+```{r}
+# create model recipe with all features
+full_model_recipe <- recipe(
+    Sale_Price ~ ., 
+    data = ames_train
+  )
+
+# train model
+results <- fit_resamples(dt_mod, full_model_recipe, kfold)
+
+# model results
+collect_metrics(results)
+```
+
+
+# Tuning
+
+```{r}
+# create model object with tuning options
+dt_mod <- decision_tree(
+  mode = "regression",
+  cost_complexity = tune(),
+  tree_depth = tune(),
+  min_n = tune()
+  ) %>% 
+  set_engine("rpart")
+
+# create the hyperparameter grid
+hyper_grid <- grid_regular(
+ cost_complexity(), 
+ tree_depth(),
+ min_n()
+ )
+
+# train our model across the hyper parameter grid
+set.seed(123)
+results <- tune_grid(dt_mod, full_model_recipe, resamples = kfold, grid = hyper_grid)
+
+# get best results
+show_best(results, metric = "rmse", n = 10)
+```
+
+# Feature interpretation
+
+```{r}
+best_model <- select_best(results, 'rmse')
+
+final_model <- decision_tree(
+  mode = "regression",
+  cost_complexity = best_model$cost_complexity,
+  tree_depth = best_model$tree_depth,
+  min_n = best_model$min_n
+  ) %>% 
+  set_engine("rpart")
+
+final_fit <- workflow() %>%
+  add_recipe(full_model_recipe) %>%
+  add_model(final_model) %>%
+  fit(data = ames_train)
+
+final_fit %>%
+  pull_workflow_fit() %>%
+  vip(20)
+```
+
+```{r}
+# prediction function
+pdp_pred_fun <- function(object, newdata) {
+  mean(predict(object, newdata, type = "numeric")$.pred)
+}
+
+# use the pdp package to extract partial dependence predictions
+# and then plot
+final_fit %>%
+  pdp::partial(
+   pred.var = "Overall_Qual", 
+   pred.fun = pdp_pred_fun,
+   grid.resolution = 10, 
+   train = ames_train
+  ) %>%
+  ggplot(aes(yhat, Overall_Qual)) +
+  geom_col() +
+  scale_x_continuous(labels = scales::dollar)
+```
+
+# Exercises
+
+Using the Boston housing data set, where the response feature is the median value of homes within a census tract (`cmedv`):
+
+1. Apply a decision tree model with all features.
+2. How many internal splitting nodes optimize model performance?
+3. Can you identify the predicted values and SEE in the terminal nodes?
+4. Identify the first feature split node and explain how it is splitting this feature.
+5. Which 10 features are considered most influential? Are these the same features that have been influential in previous models?
+6. Now perform 1-5 to the Attrition dataset, which is classification model rather than a regression model.

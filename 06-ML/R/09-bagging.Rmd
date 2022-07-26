@@ -1,0 +1,144 @@
+---
+title: "Bagging"
+output: html_notebook
+---
+
+# Prerequisites
+
+```{r}
+# Helper packages
+library(tidyverse)   # for data wrangling & plotting
+
+# Modeling packages
+library(tidymodels) 
+library(baguette)
+
+# Model interpretability packages
+library(vip)         # for variable importance
+library(pdp)         # for variable relationships
+```
+
+```{r ames-train}
+# Stratified sampling with the rsample package
+set.seed(123)
+ames <- AmesHousing::make_ames()
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+# Implementation
+
+## Basic implementation
+
+```{r}
+# create model recipe with all features
+model_recipe <- recipe(
+    Sale_Price ~ ., 
+    data = ames_train
+  )
+
+# create bagged CART model object and
+# start with 5 bagged trees
+tree_mod <- bag_tree() %>%
+  set_engine("rpart", times = 5) %>%
+  set_mode("regression")
+
+# create resampling procedure
+set.seed(13)
+kfold <- vfold_cv(ames_train, v = 5)
+
+# train model
+results <- fit_resamples(tree_mod, model_recipe, kfold)
+
+# model results
+collect_metrics(results)
+```
+
+## Tuning
+
+```{r}
+# create model recipe with all features
+model_recipe <- recipe(
+    Sale_Price ~ ., 
+    data = ames_train
+  )
+
+# create bagged CART model object with
+# tuning option set for number of bagged trees
+tree_mod <- bag_tree() %>%
+  set_engine("rpart", times = tune()) %>%
+  set_mode("regression")
+
+# create the hyperparameter grid
+hyper_grid <- expand.grid(times = c(5, 25, 50, 100, 200))
+
+# train our model across the hyper parameter grid
+set.seed(123)
+results <- tune_grid(tree_mod, model_recipe, resamples = kfold, grid = hyper_grid)
+
+
+# model results
+show_best(results, metric = "rmse")
+```
+
+# Feature interpretation
+
+```{r}
+# identify best model
+lowest_rmse <- results %>%
+  select_best("rmse")
+
+# finalize best model...
+final_model <- bag_tree() %>%
+ set_engine("rpart", times = lowest_rmse$times) %>%
+ set_mode("regression")
+
+# ...and fit
+final_fit <- workflow() %>%
+  add_recipe(model_recipe) %>%
+  add_model(final_model) %>%
+  fit(data = ames_train)
+
+# plot top 20 influential variables
+vi <- final_fit$fit$fit$fit$imp %>%
+ slice_max(order_by = value, n = 20)
+
+ggplot(vi, aes(value, reorder(term, value))) +
+ geom_col() +
+ ylab(NULL) +
+ xlab("Feature importance")
+```
+
+
+```{r}
+# prediction function
+pdp_pred_fun <- function(object, newdata) {
+  predict(object, newdata, type = "numeric")$.pred
+}
+
+# use the pdp package to extract partial dependence predictions
+# and then plot
+final_fit %>%
+  pdp::partial(
+   pred.var = "Overall_Qual", 
+   pred.fun = pdp_pred_fun,
+   grid.resolution = 10, 
+   train = ames_train
+  ) %>%
+  ggplot(aes(Overall_Qual, yhat)) +
+  geom_boxplot() +
+  scale_y_continuous(labels = scales::dollar)
+```
+
+# Exercises
+
+Using the Boston housing data set, where the response feature is the median value of homes within a census tract (`cmedv`):
+
+1. Apply a bagged decision tree model with all features.
+2. How many trees are required before the loss function stabilizes?
+3. Adjust different tuning parameters and assess how performance changes.
+4. How does the model performance compare to the decision tree model applied in the previous module's exercise?
+5. Which 10 features are considered most influential? Are these the same features that have been influential in previous model?
+6. Create partial dependence plots for the top two most influential features. Explain the relationship between the feature and the predicted values.
+7. Now perform 1-6 to the Attrition dataset, which is classification model rather than a regression model.
