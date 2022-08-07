@@ -1,0 +1,513 @@
+---
+title: "Computer vision & CNNs: Cats vs. Dogs"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+ggplot2::theme_set(ggplot2::theme_bw())
+```
+
+In this example, we are going to apply a CNN to classify dogs vs. cats images. 
+This will walk you through the fundamentals of importing images, applying image 
+augmentation, and performing classification on them.
+
+Learning objectives:
+
+- What image generators are, why and how to use them.
+- What image augmentation is, why and how to use them.
+
+# Required packages
+
+```{r}
+library(keras)
+library(glue)
+library(tidyverse)
+```
+
+# Data Preparation
+
+## Image location
+
+We are going to use the Dogs vs. Cats Kaggle competition data set
+(https://www.kaggle.com/c/dogs-vs-cats/data). However, do to size and runtime 
+limitations, we are going to only use a subset of the data.  We have already 
+set up the directories which look like:
+
+
+```{r}
+data_directory <- here::here("materials", "data")
+
+if (!dir.exists(data_directory)) {
+ dir.create(data_directory)
+}
+
+dogs_cats <- file.path(data_directory, "dogs-vs-cats")
+
+if (!dir.exists(dogs_cats)) {
+ # create main directory for images
+ dir.create(dogs_cats)
+ all_images <- file.path(dogs_cats, "full")
+ dir.create(all_images)
+ 
+ # download & extract images
+ system("kaggle competitions download -c dogs-vs-cats")
+ fs::file_move(paste0(data_directory,"/dogs-vs-cats.zip"), dogs_cats)
+ # getwd()
+ for (zip_file in c("train.zip", "test1.zip")) {
+  
+  unzip(file.path(dogs_cats, "dogs-vs-cats.zip"), 
+        files = zip_file,
+        exdir = all_images)
+  
+  unzip(file.path(all_images, zip_file), exdir = all_images)
+  file.remove(file.path(all_images, zip_file))
+ }
+ 
+ # create new subdirectories that contain only a fraction of the entire dataset
+ new_directories <- expand.grid(
+  directory = c("train", "validation", "test"),
+  animal = c("cats", "dogs"),
+  stringsAsFactors = FALSE
+ )
+ 
+ for (ob in 1:nrow(new_directories)) {
+  # create new directories to store subset of images
+  directory <- new_directories[ob, "directory"]
+  animal <- new_directories[ob, "animal"]
+  top_dir <- file.path(dogs_cats, directory)
+  sub_dir <- file.path(dogs_cats, directory, animal)
+  if (!dir.exists(top_dir)) dir.create(top_dir)
+  dir.create(sub_dir)
+  
+  # create image file names and copy to new location
+  img_tag <- switch(animal,
+                    cats = "cat.",
+                    dogs = "dog."
+  )
+  quantity <- switch(directory,
+                     train = 1:1000,
+                     validation = 1001:1500,
+                     test = 1501:2000)
+  fnames <- paste0(img_tag, quantity, ".jpg")
+  invisible(
+   file.copy(from = file.path(all_images, "train", fnames), to = sub_dir)
+  )
+ }
+ 
+ # clean up
+ invisible(file.remove(file.path(dogs_cats, "dogs-vs-cats.zip")))
+}
+```
+
+
+```
+- data
+   └── dogs-vs-cats
+       └── train
+           └── cats
+               ├── cat.1.jpg
+               ├── cat.2.jpg
+               └── ...
+           └── dogs
+               ├── dog.1.jpg
+               ├── dog.2.jpg
+               └── ...
+       └── validation
+           ├── cats
+           └── dogs
+       └── test
+           ├── cats
+           └── dogs
+```
+
+```{r image-file-paths}
+# define the directories:
+image_dir <- here::here("materials", "data", "dogs-vs-cats")
+
+train_dir <- file.path(image_dir, "train")
+valid_dir <- file.path(image_dir, "validation")
+test_dir <- file.path(image_dir, "test")
+
+# create train, validation, and test file paths for cat images
+train_cats_dir <- file.path(train_dir, "cats")
+valid_cats_dir <- file.path(valid_dir, "cats")
+test_cats_dir <- file.path(test_dir, "cats")
+
+# create train, validation, and test file paths for dog images
+train_dogs_dir <- file.path(train_dir, "dogs")
+valid_dogs_dir <- file.path(valid_dir, "dogs")
+test_dogs_dir <- file.path(test_dir, "dogs")
+```
+
+## Data set
+
+Although there are 25,000 images in this data set, we are going to use a very 
+small subset, which includes:
+
+```{r verify-data}
+glue("Cat images:",
+     " - total training cat images: {length(list.files(train_cats_dir))}",
+     " - total validation cat images: {length(list.files(valid_cats_dir))}",
+     " - total test cat images: {length(list.files(test_cats_dir))}",
+     "\n",
+     "Dog images:",
+     " - total training dog images: {length(list.files(train_dogs_dir))}",
+     " - total validation dog images: {length(list.files(valid_dogs_dir))}",
+     " - total test dog images: {length(list.files(test_dogs_dir))}",
+     .sep = "\n"
+     )
+```
+
+Let's check out the first 10 cat and dog images:
+
+```{r example-images}
+op <- par(mfrow = c(4, 5), pty = "s", mar = c(0.1, 0.1, 0.1, 0.1))
+for (i in 1:10) {
+  plot(as.raster(jpeg::readJPEG(paste0(train_cats_dir, "/cat.", i, ".jpg"))))
+  plot(as.raster(jpeg::readJPEG(paste0(train_dogs_dir, "/dog.", i, ".jpg"))))
+}
+par(op)
+```
+
+# CNN with image generator
+
+## Define and compile model
+
+We're going to set up a simple CNN model that contains steps you saw in the 
+previous module. This CNN includes:
+
+- Four sequential conv and max pooling layers
+- Flatten layer
+- Densly-connected network
+- Single binary output
+
+```{r cnn-architecture}
+model <- keras_model_sequential() %>%
+  
+  # feature detector portion of model
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", 
+                input_shape = c(150, 150, 3)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  
+  # classifier portion of model
+  layer_flatten() %>%
+  layer_dense(units = 512, activation = "relu") %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+summary(model)
+```
+
+Compile the model:
+
+```{r cnn-compile}
+model %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = optimizer_rmsprop(lr = 0.0001),
+  metrics = "accuracy"
+)
+```
+
+## Read images from directories
+
+Next, we need a process that imports our images and transforms them to tensors
+that our model can process. We'll use two functions to perform this process.
+
+`image_data_generator` will:
+
+1. Read the image files
+2. Decode the image to RGB grids of pixels
+3. Convert these into floating point tensors
+4. Rescale pixel values to [0, 1] interval
+
+`image_data_generator` provides other capabilities that we'll look at shortly.
+
+`flow_images_from_directory` will:
+
+1. Apply `image_data_generator`
+2. To a batch of 20 images at a time
+3. From our training directory (randomly shuffling between subdirectories)
+4. Resize these images to be consistent size of 150x150 pixels
+5. Apply binary labels
+
+```{r cnn-image-generator}
+train_datagen <- image_data_generator(rescale = 1/255)
+valid_datagen <- image_data_generator(rescale = 1/255)
+
+train_generator <- flow_images_from_directory(
+  train_dir,
+  train_datagen,
+  target_size = c(150, 150),
+  batch_size = 20,
+  class_mode = "binary"
+)
+
+validation_generator <- flow_images_from_directory(
+  valid_dir,
+  valid_datagen,
+  target_size = c(150, 150),
+  batch_size = 20,
+  class_mode = "binary"
+)
+```
+
+If we get the first batch from the generator, you will see that it yields 20 
+images of 150x150 pixels with three channels (20, 150, 150, 3) along with their 
+binary labels (0, 1).
+
+```{r generator-structure}
+batch <- generator_next(train_generator)
+str(batch)
+```
+
+## Train the model
+
+To train our model we'll use `fit_generator` which is the equivalent of `fit` 
+for data generators.  We provide it our generators for the training and 
+validation data.  Plus, we need to specify:
+
+- `steps_per_epoch`: how many samples to draw from the training generator before 
+  declaring an epoch over. Our generator supplies batches of 20 and we have 
+  2,000 training images so we need 100 steps.
+- `validation_steps`: how many samples to draw from the validation generator. 
+  Our generator supplies batches of 20 and we have 1,000 validation images so we
+  need 50 steps.
+  
+__Note__:
+
+* Without a GPU this will take approximately 20 minutes to train
+* With GPUs this will take approximately 5 minutes
+
+```{r cnn-train}
+history <- model %>% fit_generator(
+  train_generator,
+  steps_per_epoch = 100,
+  epochs = 30,
+  validation_data = validation_generator,
+  validation_steps = 50,
+  callbacks = callback_early_stopping(patience = 5)
+)
+```
+
+Our first model's performance is not that bad but definitely has room for
+improvement.
+
+```{r initial-model-results}
+best_epoch <- which.min(history$metrics$val_loss)
+best_loss <- history$metrics$val_loss[best_epoch] %>% round(3)
+best_acc <- history$metrics$val_accuracy[best_epoch] %>% round(3)
+
+glue("Our optimal loss is {best_loss} with an accuracy of {best_acc}")
+```
+
+
+```{r plot-history}
+plot(history) + 
+  scale_x_continuous(limits = c(0, length(history$metrics$val_loss)))
+```
+
+
+# CNN with Image Augmentation
+
+## Image Augmentation
+
+Our model above does ok but definitely has room for improvement. One approach 
+to improve performance is to collect more data. Unfortunately, this is not always 
+an option. An alternative is to use ___image augmentation___. [ℹ️](https://misk-data-science.github.io/misk-dl/02-computer-vision.html#38)
+
+```{r image-augmentation}
+datagen <- image_data_generator(
+  rescale = 1/255,
+  rotation_range = 40,
+  width_shift_range = 0.2,
+  height_shift_range = 0.2,
+  shear_range = 0.2,
+  zoom_range = 0.2,
+  horizontal_flip = TRUE,
+  fill_mode = "nearest"
+)
+```
+
+The following helps to visualize the idea of image augmentation by:
+
+- Reading in the first image and resizing it to 150x150,
+- Converting it to an array with shape (150, 150, 3),
+- Reshaping it to (1, 150, 150, 3),
+- Generating batches of randomly transformed images.
+
+```{r view-augmented-images}
+# get the first cat image
+fnames <- list.files(train_cats_dir, full.names = TRUE)
+img_path <- fnames[[1]]
+
+# resize & reshape
+img <- image_load(img_path, target_size = c(150, 150))
+img_array <- image_to_array(img)
+img_array <- array_reshape(img_array, c(1, 150, 150, 3))
+
+# generate a a single augmented image
+augmentation_generator <- flow_images_from_data(
+  img_array,
+  generator = datagen,
+  batch_size = 1
+)
+
+# plot 10 augmented images of the first cat image
+op <- par(mfrow = c(2, 5), pty = "s", mar = c(0, 0.1, 0, 0.1))
+for (i in 1:10) {
+  batch <- generator_next(augmentation_generator)
+  plot(as.raster(batch[1,,,]))
+}
+par(op)
+```
+
+## Build & train model
+
+Let's create a new model that includes image augmentation and we'll apply the 
+dropout regularization method. The following creates a CNN architecture with:
+
+- Four sequential conv and max pooling layers
+- Flatten layer
+- Dropout layer
+- Densly-connected network
+
+All of which you are familiary with by now.
+
+```{r cnn-structure2}
+model <- keras_model_sequential() %>%
+  layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu", 
+                input_shape = c(150, 150, 3)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 64, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_conv_2d(filters = 128, kernel_size = c(3, 3), activation = "relu") %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+  layer_flatten() %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 512, activation = "relu") %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+model %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = optimizer_rmsprop(lr = 0.0001),
+  metrics = "accuracy"
+)
+```
+
+Now we can add image augmentation to our `image_data_generator()`. The rest of 
+the inputs remain the same.
+
+__Note__:
+
+* Without a GPU this will take approximately 60 minutes to train
+* With GPUs this will take approximately 20-30 minutes
+
+```{r augment-and-train}
+# only augment training data
+train_datagen <- image_data_generator(
+  rescale = 1/255,
+  rotation_range = 40,
+  width_shift_range = 0.2,
+  height_shift_range = 0.2,
+  shear_range = 0.2,
+  zoom_range = 0.2,
+  horizontal_flip = TRUE,
+)
+
+# do not augment test and validation data
+test_datagen <- image_data_generator(rescale = 1/255)
+
+# generate batches of data from training directory
+train_generator <- flow_images_from_directory(
+  train_dir,
+  train_datagen,
+  target_size = c(150, 150),
+  batch_size = 20,
+  class_mode = "binary"
+)
+
+# generate batches of data from validation directory
+validation_generator <- flow_images_from_directory(
+  valid_dir,
+  test_datagen,
+  target_size = c(150, 150),
+  batch_size = 20,
+  class_mode = "binary"
+)
+
+# train model
+history <- model %>%
+  fit_generator(
+    train_generator,
+    steps_per_epoch = 100,
+    epochs = 100,
+    validation_data = validation_generator,
+    validation_steps = 50,
+    callbacks = callback_early_stopping(patience = 10)
+  )
+```
+
+As you can see, using image augmentation helps to improve our model's
+performance. In fact, if we had more `patience` with our early stopping we may
+even be able to nudge out a little more loss reduction.
+
+```{r second-model-results}
+best_epoch <- which.min(history$metrics$val_loss)
+best_loss <- history$metrics$val_loss[best_epoch] %>% round(3)
+best_acc <- history$metrics$val_accuracy[best_epoch] %>% round(3)
+
+glue("Our optimal loss is {best_loss} with an accuracy of {best_acc}")
+```
+
+
+```{r second-model-plot}
+plot(history) + 
+  scale_x_continuous(limits = c(0, length(history$metrics$val_loss)))
+```
+
+## Save the model
+
+We can always save our models as h5 files. Let's save this model as we will use
+it one of the "extras" notebooks to illustrate how we can visualize CNNs (see
+this notebook https://misk-data-science.github.io/misk-dl/notebooks/99x6-visualizing-what-cnns-learn.nb.html).
+
+```{r save-model}
+model %>% save_model_hdf5("cats_and_dogs_small_1.h5")
+```
+
+However, we still have room for improvement because we are only using a small
+subset of the available data. We have two options to improve our model:
+
+1. Use more data. We are only using 2,000 of the 25,000 available images.
+   However, this would have a significant impact on compute time.
+   
+2. Use transfer learning. This is much quicker than the first option so in the
+   next module I demonstrate how to use transfer learning for CNNs.
+
+# Takeways
+
+* When using image data we...
+   - use `image_data_generator` to read the images, decode pixel values, convert
+     to a tensor, rescale, and perform image augmentation.
+   - use `flow_images_from_directory` import batches of our images, apply the
+     `image_data_generator`, resize, and infer training labels.
+     
+* Image augmentation such as zooming, flipping, rotating, shearing, etc. helps
+  with image variance, provides free additional data, and generally improves
+  model performance.
+  
+[🏠](https://github.com/misk-data-science/misk-dl)

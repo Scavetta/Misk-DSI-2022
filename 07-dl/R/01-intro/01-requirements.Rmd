@@ -1,0 +1,378 @@
+---
+title: "Installing Requirements"
+output: github_document
+---
+
+This notebook will help you install all the required packages and data sets used
+throughout this workshop.
+
+# Packages
+
+Although this training focuses on the __keras__ package, we will use several
+additional packages throughout our modules. At the beginning of each module I
+state the primary purpose of the packages used so if some of these packages are
+not familiar, that is okay.
+
+Run the following code chunk to install packages not already installed. Within
+the RStudio workshop, this has already been taken care of for you.
+
+```{r}
+pkgs <- c(
+  "AmesHousing",
+  "caret",
+  "data.table",
+  "flexdashboard",
+  "fs",
+  "glue",
+  "grid",
+  "gridExtra",
+  "here",
+  "jpeg",
+  "keras",
+  "lime",
+  "magick",
+  "mlbench",
+  "MLmetrics",
+  "plotly",
+  "progress",
+  "recipes",
+  "ROCR",
+  "Rtsne",
+  "rsample",
+  "scales",
+  "testthat",
+  "text2vec",
+  "tfruns",
+  "tidyverse",
+  "viridis"
+)
+
+missing_pkgs <- pkgs[!(pkgs %in% installed.packages()[, "Package"])]
+
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+```
+
+Depending on how often you update your packages you may also want to see if any
+of these packages that you had installed previously need to be updated to more
+recent versions. You can run the following to make necessary updates.
+
+```{r, eval=FALSE}
+update.packages(oldPkgs = pkgs, ask = FALSE, repos = "https://cran.rstudio.com/")
+```
+
+# Datasets
+
+We will use a variety of datasets throughout this workshop; many of which are
+too large to hold within the github repository. The following will help you 
+download all necessary datasets and store them in the `\data` folder. For those
+attending the RStudio workshop, this has already been taken care of for you.
+
+```{r}
+data_directory <- here::here("materials", "data")
+
+if (!dir.exists(data_directory)) {
+  dir.create(data_directory)
+}
+```
+
+## Dogs vs cats
+
+Used for image classification. Contains 25,000 images of dogs and cats
+from [Kaggle](https://www.kaggle.com/c/dogs-vs-cats/data). To download,
+you will need to following these steps:
+
+1.  Create a Kaggle account
+2.  Install the [Kaggle API](https://github.com/Kaggle/kaggle-api) with…
+      - Run `pip install kaggle` in the terminal or
+      - Run `system("pip install kaggle")` in the RStudio console
+3.  Go to your Kaggle Account settings and select “Create New API
+    Token”. This will download a JSON file with your access token.
+4.  Move the JSON token file to the `/Users/your_id/.kaggle` folder
+    ([reference](https://github.com/Kaggle/kaggle-api/issues/15))
+
+**Note**: If you experience the following error `bash: kaggle: command
+not found` you may need to explicitly state the kaggle path in your
+.bash\_profile. See this related
+[issue](https://github.com/rstudio-conf-2020/dl-keras-tf/issues/4) for
+more details. If you get a `403 Forbidden` error from the kaggle API call then
+you may need to go to the [competition rules page](https://www.kaggle.com/c/dogs-vs-cats/rules)
+and accept the competition terms.
+
+Now you should be able to execute the following code to download the
+data. This will download all the data but only place a fraction of the
+data in train, validation, and test folders.
+
+
+```{r}
+dogs_cats <- file.path(data_directory, "dogs-vs-cats")
+
+if (!dir.exists(dogs_cats)) {
+  # create main directory for images
+  dir.create(dogs_cats)
+  all_images <- file.path(dogs_cats, "full")
+  dir.create(all_images)
+
+  # download & extract images
+  system("kaggle competitions download -c dogs-vs-cats")
+  fs::file_move("dogs-vs-cats.zip", dogs_cats)
+  
+  for (zip_file in c("train.zip", "test1.zip")) {
+
+    unzip(file.path(dogs_cats, "dogs-vs-cats.zip"), 
+        files = zip_file,
+        exdir = all_images)
+    
+    unzip(file.path(all_images, zip_file), exdir = all_images)
+    file.remove(file.path(all_images, zip_file))
+  }
+
+  # create new subdirectories that contain only a fraction of the entire dataset
+  new_directories <- expand.grid(
+    directory = c("train", "validation", "test"),
+    animal = c("cats", "dogs"),
+    stringsAsFactors = FALSE
+    )
+  
+  for (ob in 1:nrow(new_directories)) {
+    # create new directories to store subset of images
+    directory <- new_directories[ob, "directory"]
+    animal <- new_directories[ob, "animal"]
+    top_dir <- file.path(dogs_cats, directory)
+    sub_dir <- file.path(dogs_cats, directory, animal)
+    if (!dir.exists(top_dir)) dir.create(top_dir)
+    dir.create(sub_dir)
+    
+    # create image file names and copy to new location
+    img_tag <- switch(animal,
+                      cats = "cat.",
+                      dogs = "dog."
+                      )
+    quantity <- switch(directory,
+                       train = 1:1000,
+                       validation = 1001:1500,
+                       test = 1501:2000)
+    fnames <- paste0(img_tag, quantity, ".jpg")
+    invisible(
+      file.copy(from = file.path(all_images, "train", fnames), to = sub_dir)
+    )
+  }
+
+  # clean up
+  invisible(file.remove(file.path(dogs_cats, "dogs-vs-cats.zip")))
+}
+```
+
+
+
+## Natural images
+
+Used for the image classification project for day 1. This dataset was
+orginally created as a benchmark dataset for the work on [*Effects of
+Degradations on Deep Neural Network
+Architectures*](https://arxiv.org/abs/1807.10108). The source code is
+publicly available on
+[GitHub](https://github.com/prasunroy/cnn-on-degraded-images) but the
+data was pulled from
+[Kaggle](https://www.kaggle.com/prasunroy/natural-images).
+
+This dataset contains 6,899 images from 8 distinct classes compiled from
+various sources. The classes include airplane, car, cat, dog, flower,
+fruit, motorbike and person.
+
+Similar to the Dogs vs. Cats data, you will need a Kaggle account to
+download and the Kaggle API to download this data.
+
+```{r}
+natural_images <- file.path(data_directory, "natural_images")
+
+if (!dir.exists(natural_images)) {
+  system("kaggle datasets download -d prasunroy/natural-images")
+  fs::file_move("natural-images.zip", data_directory)
+  unzip(file.path(data_directory, "natural-images.zip"), exdir = data_directory)
+  
+  original_dataset_dir <- file.path(data_directory, "natural_images")
+  folders <- list.files(original_dataset_dir)
+  
+  for (new_folder in c("train", "validation", "test", "full")) {
+    dir.create(file.path(original_dataset_dir, new_folder))
+  }
+  
+  for (folder in folders) {
+  
+    # original & new path
+    original_path <- file.path(original_dataset_dir, folder)
+    
+    # get number of images
+    # 60% will go to training, 20% to validation, and the rest to testing
+    n_total_images <- length(list.files(file.path(original_dataset_dir, folder)))
+    n_train_images <- floor(n_total_images * .60)
+    n_valid_images <- floor(n_total_images * .20)
+    
+    # save 60% of images to train
+    first_train_image <- 0
+    last_train_image <- n_train_images - 1
+    train_ext <-  stringr::str_pad(first_train_image:last_train_image, 4, pad = "0")
+    train_images <- paste0(folder, "_", train_ext, ".jpg")
+    train_path <- file.path(original_dataset_dir, "train", folder)
+    dir.create(train_path)
+    invisible(file.copy(from = file.path(original_path, train_images), to = train_path))
+    
+    # save 20% of images to valid
+    first_valid_image <- last_train_image + 1
+    last_valid_image <- first_valid_image + n_valid_images - 1
+    valid_ext <-  stringr::str_pad(first_valid_image:last_valid_image, 4, pad = "0")
+    valid_images <- paste0(folder, "_", valid_ext, ".jpg")
+    valid_path <- file.path(original_dataset_dir, "validation", folder)
+    dir.create(valid_path)
+    invisible(file.copy(from = file.path(original_path, valid_images), to = valid_path))
+    
+    # save 20% of images to test
+    first_test_image <- last_valid_image + 1
+    last_test_image <- n_total_images - 1 
+    test_ext <- stringr::str_pad(first_test_image:last_test_image, 4, pad = "0")
+    test_images <- paste0(folder, "_", test_ext, ".jpg")
+    test_path <- file.path(original_dataset_dir, "test", folder)
+    dir.create(test_path)
+    invisible(file.copy(from = file.path(original_path, test_images), to = test_path))
+    
+    fs::file_move(original_path, file.path(original_dataset_dir, "full"))
+  }
+  
+  # clean up
+  invisible(file.remove(file.path(data_directory, "natural-images.zip")))
+  fs::dir_delete(file.path(data_directory, "data"))
+}
+```
+
+## IMDB
+
+Although there is a built-in IMDB dataset, we will use the original data provided
+at http://ai.stanford.edu/~amaas/data/sentiment to go through the process of
+importing and preparing the dataset for analysis. This dataset has the same
+50K reviews as the built-in dataset and the reviews are separated into training
+(25K) and testing (25K).
+
+```{r}
+imdb_data <- file.path(data_directory, "imdb")
+
+if (!dir.exists(imdb_data)) {
+  url <- "http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
+  download.file(url, destfile = "aclImdb_v1.tar.gz")
+  untar("aclImdb_v1.tar.gz", exdir = data_directory)
+  file.rename(file.path(data_directory, "aclImdb"), imdb_data)
+
+  # get all unnecessary files/directories and remove
+  all_dir <- fs::dir_ls(imdb_data, recurse = TRUE, type = "directory", regexp = "[^(train|test)]$")
+  relevant_dir <- fs::dir_ls(imdb_data, recurse = TRUE, type = "directory", regexp = "(neg|pos)$")
+  irrelevant_dir <- setdiff(all_dir, relevant_dir)
+  
+  all_files <- list.files(imdb_data, full.names = TRUE, recursive = TRUE)
+  relevant_files <- list.files(relevant_dir, full.names = TRUE)
+  irrelevant_files <- c(setdiff(all_files, relevant_files), irrelevant_dir)
+  
+  sapply(irrelevant_files, function(x) invisible(file.remove(x)))
+  
+  # clean up
+  invisible(file.remove("aclImdb_v1.tar.gz"))
+}
+```
+
+## Pretrained GloVe embeddings
+
+Used for the word embeddings modules. [GloVe](https://nlp.stanford.edu/projects/glove/)
+is a pretrained language model that contains various weight sizes. The following
+downloads the 100 dimension embedding weights based on Wikipedia 2014 and
+Gigaword 5. 
+
+```{r}
+glove_data <- file.path(data_directory, "glove")
+
+if (!dir.exists(glove_data)) {
+  dir.create(glove_data)
+  url <- "http://nlp.stanford.edu/data/glove.6B.zip"
+  download.file(url, destfile = "glove.6B.zip")
+  unzip("glove.6B.zip", files = "glove.6B.100d.txt", exdir = glove_data)
+  invisible(file.remove("glove.6B.zip"))
+}
+```
+
+## Amazon fine foods reviews
+
+Used for the word embeddings mini-project. This dataset comes from
+https://snap.stanford.edu/data/web-FineFoods.html and consists of reviews of
+fine foods from amazon. The data span a period of more than 10 years, including
+all ~500,000 reviews up to October 2012. Reviews include product and user
+information, ratings, and a plaintext review.
+
+```{r}
+amazon_data <- file.path(data_directory, "amazon-food")
+
+if (!dir.exists(amazon_data)) {
+  dir.create(amazon_data)
+  url <- "https://snap.stanford.edu/data/finefoods.txt.gz"
+  download.file(url, destfile = "finefoods.txt.gz")
+  R.utils::gunzip("finefoods.txt.gz")
+  fs::file_move(file.path("finefoods.txt"), new_path = amazon_data)
+}
+```
+
+## MovieLens
+
+Used for collaborative filtering module to illustrate how to create a movie
+recommendation system. This data comes from https://grouplens.org/datasets/movielens/.
+There are multiple dataset sizes; however, for efficiency we will use the smaller
+dataset that contains 100,000 ratings of 9,900 movies rated by ~700 users.
+
+```{r}
+movielens_data <- file.path(data_directory, "ml-latest-small")
+
+if (!dir.exists(movielens_data)) {
+  url <- "http://files.grouplens.org/datasets/movielens/ml-latest-small.zip"
+  download.file(url, destfile = "ml-latest-small.zip")
+  unzip("ml-latest-small.zip", exdir = data_directory)
+  invisible(file.remove("ml-latest-small.zip"))
+}
+```
+
+## Yelp reviews
+
+Used for sentiment classification. Contains 1,569,264 samples from the 
+[Yelp Dataset Challenge 2015](https://www.yelp.com/dataset/challenge). This 
+subset has 280,000 training samples and 19,000 test samples in each polarity.
+
+```{r}
+yelp_data <- file.path(data_directory, "yelp_review_polarity_csv")
+
+if (!dir.exists(yelp_data)) {
+  url <- "http://s3.amazonaws.com/fast-ai-nlp/yelp_review_polarity_csv.tgz"
+  download.file(url, destfile = "tmp.tar.gz")
+  untar("tmp.tar.gz", exdir = data_directory)
+  invisible(file.remove("tmp.tar.gz"))
+}
+```
+
+## Cornell reviews
+
+Used for the LSTM mini-project. This dataset comes from
+http://www.cs.cornell.edu/people/pabo/movie-review-data/ and consists of movie
+reviews introduced in [Pang & Lee (2004)](https://bit.ly/2SWGVBZ) with 2000
+total observations. Detailed information about the data can be found [here](https://bit.ly/2N08o22).
+
+```{r}
+cornell_reviews <- file.path(data_directory, "cornell_reviews")
+
+if (!dir.exists(cornell_reviews)) {
+  dir.create(cornell_reviews)
+  url <- "http://www.cs.cornell.edu/people/pabo/movie-review-data/review_polarity.tar.gz"
+  download.file(url, destfile = "review_polarity.tar.gz")
+  untar("review_polarity.tar.gz", exdir = cornell_reviews)
+  invisible(file.remove("review_polarity.tar.gz"))
+  invisible(file.rename(
+    from = file.path(cornell_reviews, "txt_sentoken"), 
+    to = file.path(cornell_reviews, "data"))
+  )
+}
+```
+
