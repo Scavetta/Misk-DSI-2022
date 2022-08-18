@@ -1,0 +1,53 @@
+---
+title: "Interactive Markdown Exercise 1"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+```
+
+# An interactive ggplot
+
+Add the code from our tutorial to make an interactive document:
+
+Additional exercise: Also change the colors in some way
+
+SSee help page for `shiny::selectInput()`
+
+Input elements include (click for online R helpdocum:
+
+[`selectInput()`](https://www.rdocumentation.org/packages/shiny.semantic/versions/0.4.3/topics/selectInput)
+
+actionButton(), checkboxGroupInput(), checkboxInput(), dateInput(), dateRangeInput(), fileInput(), numericInput(), passwordInput(), radioButtons(), sliderInput(), submitButton(), textAreaInput(), textInput(), [varSelectInput()](http://127.0.0.1:50605/help/library/shiny/help/varSelectInput)
+
+
+```{r echo = FALSE}
+
+inputPanel({
+  radioButtons("shape", label = "Circle:",
+               c("Filled" = 16,
+                 "Hollow" = 1))
+})
+
+
+inputPanel({
+  sliderInput("col", label = "Choose color number", 
+              min = 0,
+              max = 100, 
+              value = 1)
+})
+
+
+renderPlot({
+  ggplot(mtcars, aes(mpg, wt)) +
+    geom_point(shape = as.numeric(input$shape), 
+               color = input$col,
+               alpha = 0.75, size = 10)
+})
+
+```
+
+

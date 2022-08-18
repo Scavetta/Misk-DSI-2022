@@ -1,0 +1,214 @@
+---
+title: "Model Stacking"
+output: html_notebook
+---
+
+## Prerequisites
+
+```{r pkg-req}
+# Helper packages
+library(tidyverse)
+
+# Modeling packages
+library(tidymodels)
+library(stacks)
+```
+
+```{r ames-train}
+set.seed(123)
+ames <- AmesHousing::make_ames()
+split  <- rsample::initial_split(ames, prop = 0.7, strata = "Sale_Price")
+ames_train  <- rsample::training(split)
+ames_test   <- rsample::testing(split)
+```
+
+# Implementing stacking
+
+```{r}
+# create model recipe with all features
+lvls <- c("Very_Poor", "Poor", "Fair", "Below_Average", "Average", "Typical", 
+          "Above_Average", "Good", "Very_Good", "Excellent", "Very_Excellent")
+
+model_recipe <- recipe(
+    Sale_Price ~ ., 
+    data = ames_train
+  ) %>%
+  step_string2factor(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"),
+    levels = lvls
+    ) %>% 
+  step_unknown(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"), 
+    new_level = "None"
+    ) %>%
+  step_relevel(
+    ends_with("Qual"), ends_with("QC"), ends_with("_Cond"), 
+    ref_level = "None"
+    ) %>%
+  step_integer(ends_with("Qual"), ends_with("QC"), ends_with("_Cond")) %>%
+  step_dummy(all_nominal(), one_hot = TRUE)
+```
+
+```{r}
+# define a minimal workflow
+model_wflow <- 
+  workflow() %>% 
+  add_recipe(model_recipe)
+
+# define loss metric as RMSE
+metric <- metric_set(rmse)
+```
+
+```{r}
+ctrl_res <- control_stack_resamples()
+```
+
+
+```{r}
+# use a 5-fold cross-validation
+set.seed(1)
+folds <- rsample::vfold_cv(ames_train, v = 5)
+```
+
+```{r}
+###########################
+# Linear regression model #
+###########################
+# create a linear model definition
+lm_spec <- linear_reg() %>%
+  set_engine("lm")
+
+# add it to a workflow
+lm_wflow <- model_wflow %>% 
+  add_model(lm_spec)
+
+# fit to the 5-fold cv
+set.seed(1)
+lm_res <- 
+  fit_resamples(
+    lm_wflow,
+    resamples = folds,
+    metrics = metric,
+    control = ctrl_res
+  )
+
+#######################
+# Decision tree model #
+#######################
+# create a decistion tree model definition
+dt_spec <- decision_tree(
+  mode = "regression",
+  cost_complexity = 0.0000000001,
+  tree_depth = 8,
+  min_n = 21
+  ) %>% 
+  set_engine("rpart")
+
+# add it to a workflow
+dt_wflow <- model_wflow %>% 
+  add_model(dt_spec)
+
+# fit to the 5-fold cv
+set.seed(1)
+dt_res <- 
+  fit_resamples(
+    dt_wflow,
+    resamples = folds,
+    metrics = metric,
+    control = ctrl_res
+  )
+
+#######################
+# Random forest model #
+#######################
+# create random forest model object
+rf_spec <- rand_forest(
+  mode = "regression", 
+  trees = 1000,
+  mtry = 20,
+  min_n = 1
+  ) %>%
+  set_engine(
+    "ranger",
+    replace = FALSE,
+    sample.fraction = 0.8,
+    respect.unordered.factors = 'order',
+    seed = 123
+    )
+
+# add it to a workflow
+rf_wflow <- model_wflow %>% 
+  add_model(rf_spec)
+
+# fit to the 5-fold cv
+set.seed(1)
+rf_res <- 
+  fit_resamples(
+    rf_wflow,
+    resamples = folds,
+    metrics = metric,
+    control = ctrl_res
+  )
+
+#################
+# XGBoost model #
+#################
+# create XGBoost model object
+xgb_spec <- boost_tree(
+  trees = 5000,
+  learn_rate = 0.0683,
+  tree_depth = 9,
+  min_n = 23,
+  sample_size = 0.828,
+  mtry = 66,
+  loss_reduction = 4.64e-3,
+  stop_iter = 10
+) %>% 
+  set_engine(
+    "xgboost"
+    ) %>% 
+  set_mode("regression")
+
+# add it to a workflow
+xgb_wflow <- model_wflow %>% 
+  add_model(xgb_spec)
+
+# fit to the 5-fold cv
+set.seed(1)
+xgb_res <- 
+  fit_resamples(
+    xgb_wflow,
+    resamples = folds,
+    metrics = metric,
+    control = ctrl_res
+  )
+```
+
+```{r}
+stacked_regressor <- stacks() %>%
+  add_candidates(lm_res) %>%
+  add_candidates(dt_res) %>%
+  add_candidates(rf_res) %>%
+  add_candidates(xgb_res)
+```
+
+```{r}
+fitted_stack <- stacked_regressor %>%
+  blend_predictions() %>%
+  fit_members()
+```
+
+```{r}
+pred <- fitted_stack %>% predict(ames_test)
+
+rmse_vec(ames_test$Sale_Price, pred$.pred)
+```
+
+
+# Exercises
+
+Using the Boston housing data set, where the response feature is the median value of homes within a census tract (`cmedv`):
+
+1. Recreate the optimal models identified from the exercises in the [linear regression](https://misk-data-science.github.io/misk-homl/docs/notebooks/04-linear-regression.html#Exercises),  [decision tree](https://misk-data-science.github.io/misk-homl/docs/notebooks/09-decision-trees.html#Exercises), [random forest](https://misk-data-science.github.io/misk-homl/docs/notebooks/11-random-forests.html#Exercises), and [gradient boosting](https://misk-data-science.github.io/misk-homl/docs/notebooks/12-gbm.html#Exercises) modules.
+2. Apply a stacked model and compare the model performance to the individual models.
+3. Now repeat 1 & 2 for the Attrition dataset, which is classification model rather than a regression model.

@@ -1,0 +1,35 @@
+---
+title: "Interactive Markdown Exercise 1"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+```
+
+# Making a simple UI
+
+```{r echo = FALSE}
+
+inputPanel({
+  selectInput(
+    "color",
+    "Color according to...",
+    c("clarity", "depth", "table", "x", "y", "z"),
+    selected = "cut"
+  )
+})
+
+
+renderPlot({
+  ggplot(diamonds, aes_string("carat", "price", color = input$color)) +
+    geom_point()
+})
+
+```
+
+
+

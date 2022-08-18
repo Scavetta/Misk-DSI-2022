@@ -1,0 +1,67 @@
+---
+title: "Interactive Markdown Exercise 2"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(MASS)
+```
+
+# My first Interactive ggplot
+
+Using `ggplot(mtcars, aes(wt, mpg))`, add interactive components to include:
+
+1. Radio buttons to show or hide the dots & lm
+1. Radio buttons to choose model ("lm", "loess", or "rlm", a _robust_ lm from the `MASS` package)
+1. Slider input to choose the span (0.15 - 0.90) when using LOESS model
+
+For extra practice:
+
+- Option to show or hide the SE on the models
+- Slide for the alpha in the dots
+
+
+```{r echo = FALSE}
+
+
+inputPanel({
+  
+  
+  radioButtons("view", label = "View options",
+               choices = list("points", 
+                              "model", 
+                              "both"),
+               selected = "points")
+  
+})
+
+renderPlot({
+  
+  # Define the base layer
+  p <- ggplot(mtcars, aes(wt, mpg))
+  
+  addPoints <- geom_point() # add points geom
+  
+  addModel <- geom_smooth(method = "lm", se = FALSE) # add stats model
+
+  # Now define how to display:
+  if (input$view == "points") {
+    p <- p +
+      addPoints
+  } else if (input$view == "model") {
+    p <- p +
+      addModel
+  } else if (input$view == "both") {
+    p <- p + 
+      addPoints +
+      addModel
+  }
+
+  p
+  
+  })
+
+```

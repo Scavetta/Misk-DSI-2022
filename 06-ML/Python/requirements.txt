@@ -1,0 +1,18 @@
+category_encoders >= 2.2.2
+feature_engine >= 1.1.0
+matplotlib >= 3.4.2
+missingno >= 0.4.2
+numpy >= 1.21.0
+pandas >= 1.2.5
+plotnine >= 0.8.0
+scikit-learn >= 0.24.2
+scipy >= 1.7.0
+xgboost >= 1.4.2
+
+# The following imports pyearth from the Github repository located at
+# https://github.com/scikit-learn-contrib/py-earth. If this fails then
+# you can perform the following steps manually to import pyearth:
+# 1. git clone git://github.com/scikit-learn-contrib/py-earth.git
+# 2. cd py-earth
+# 3. sudo python setup.py install
+git+git://github.com/scikit-learn-contrib/py-earth@400f84d435b7277124535c09ca32132c1d0eaa74
